@@ -14,42 +14,37 @@
       from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
     // ==========================================
-    // CONFIGURACIÓN DE FIREBASE (Reemplazar con tus datos)
+    // CONFIGURACIÓN DE FIREBASE
     // ==========================================
     const firebaseConfig = {
-    apiKey: "AIzaSyAcnfJFlnJKEtX_T1RDarphX2Be2rX8tEg",
-    authDomain: "tatocows.firebaseapp.com",
-    databaseURL: "https://tatocows-default-rtdb.firebaseio.com",
-    projectId: "tatocows",
-    storageBucket: "tatocows.firebasestorage.app",
-    messagingSenderId: "145845925802",
-    appId: "1:145845925802:web:40baed1fdbeb90b4991dd3",
-    measurementId: "G-3M1F1362RN"
+      apiKey: "AIzaSyAcnfJFlnJKEtX_T1RDarphX2Be2rX8tEg",
+      authDomain: "tatocows.firebaseapp.com",
+      databaseURL: "https://tatocows-default-rtdb.firebaseio.com",
+      projectId: "tatocows",
+      storageBucket: "tatocows.firebasestorage.app",
+      messagingSenderId: "145845925802",
+      appId: "1:145845925802:web:40baed1fdbeb90b4991dd3",
+      measurementId: "G-3M1F1362RN"
     };
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // Referencias a los nodos
     const corralesRef = ref(db, 'corrales');
     const historialRef = ref(db, 'historial');
     const fletesRef = ref(db, 'fletes');
 
-    // Variables globales de estado local
     window.corralesData = {};
     window.historialData = [];
     window.fletesData = [];
 
-    // Escuchar Corrales
     onValue(corralesRef, (snapshot) => {
-      const data = snapshot.val() || {};
-      window.corralesData = data;
+      window.corralesData = snapshot.val() || {};
       renderCorrales();
       renderStats();
       populateSelects();
     });
 
-    // Escuchar Historial
     onValue(historialRef, (snapshot) => {
       const data = snapshot.val() || {};
       window.historialData = Object.keys(data).map(key => ({ id: key, ...data[key] }));
@@ -57,7 +52,6 @@
       renderHistorial();
     });
 
-    // Escuchar Fletes
     onValue(fletesRef, (snapshot) => {
       const data = snapshot.val() || {};
       window.fletesData = Object.keys(data).map(key => ({ id: key, ...data[key] }));
@@ -66,7 +60,6 @@
       renderStats();
     });
 
-    // Funciones globales de base de datos
     window.crearCorral = function() {
       const input = document.getElementById('nombreCorralInput');
       const nombre = input.value.trim();
@@ -91,6 +84,7 @@
       const motivo = document.getElementById('movMotivoSelect').value;
       const notas = document.getElementById('movNotasInput').value.trim();
       const usuario = document.getElementById('movUsuarioInput').value.trim() || 'Operador';
+      const corralDestinoId = document.getElementById('movCorralDestinoSelect').value;
 
       const cantidad = parseInt(cantidadInput.value, 10);
       if (!corralId || isNaN(cantidad) || cantidad <= 0) {
@@ -101,36 +95,78 @@
       const corralActual = window.corralesData[corralId];
       if (!corralActual) return;
 
-      let nuevaCantidad = corralActual.cantidad;
       if (tipo === 'SUMAR') {
-        nuevaCantidad += cantidad;
+        const nuevaCantidad = corralActual.cantidad + cantidad;
+        set(ref(db, `corrales/${corralId}/cantidad`), nuevaCantidad);
+
+        const nuevoMovRef = push(historialRef);
+        set(nuevoMovRef, {
+          corralId: corralId,
+          nombreCorral: corralActual.nombre,
+          tipo: 'SUMAR',
+          cantidad: cantidad,
+          motivo: motivo,
+          notas: notas,
+          usuario: usuario,
+          timestamp: Date.now()
+        }).then(() => finalizarMovimiento());
+
       } else {
+        // RESTAR o TRASLADO
         if (cantidad > corralActual.cantidad) {
           if (!confirm(`La cantidad a restar (${cantidad}) supera las vacas en el corral (${corralActual.cantidad}). ¿Continuar de todos modos?`)) {
             return;
           }
         }
-        nuevaCantidad = Math.max(0, nuevaCantidad - cantidad);
+
+        const nuevaCantidadOrigen = Math.max(0, corralActual.cantidad - cantidad);
+        set(ref(db, `corrales/${corralId}/cantidad`), nuevaCantidadOrigen);
+
+        if (motivo === 'Traslado' && corralDestinoId) {
+          if (corralId === corralDestinoId) {
+            alert("El corral de origen y destino no pueden ser el mismo.");
+            return;
+          }
+          const corralDestino = window.corralesData[corralDestinoId];
+          if (corralDestino) {
+            const nuevaCantidadDestino = corralDestino.cantidad + cantidad;
+            set(ref(db, `corrales/${corralDestinoId}/cantidad`), nuevaCantidadDestino);
+
+            // Registrar entrada en destino
+            const movDestinoRef = push(historialRef);
+            set(movDestinoRef, {
+              corralId: corralDestinoId,
+              nombreCorral: corralDestino.nombre,
+              tipo: 'SUMAR',
+              cantidad: cantidad,
+              motivo: 'Traslado (Entrada)',
+              notas: `Desde ${corralActual.nombre} ${notas ? '- ' + notas : ''}`,
+              usuario: usuario,
+              timestamp: Date.now()
+            });
+          }
+        }
+
+        // Registrar salida en origen
+        const nuevoMovRef = push(historialRef);
+        set(nuevoMovRef, {
+          corralId: corralId,
+          nombreCorral: corralActual.nombre,
+          tipo: 'RESTAR',
+          cantidad: cantidad,
+          motivo: motivo,
+          notas: motivo === 'Traslado' && corralDestinoId ? `Hacia ${window.corralesData[corralDestinoId]?.nombre || ''} ${notas ? '- ' + notas : ''}` : notas,
+          usuario: usuario,
+          timestamp: Date.now()
+        }).then(() => finalizarMovimiento());
       }
-
-      set(ref(db, `corrales/${corralId}/cantidad`), nuevaCantidad);
-
-      const nuevoMovRef = push(historialRef);
-      set(nuevoMovRef, {
-        corralId: corralId,
-        nombreCorral: corralActual.nombre,
-        tipo: tipo,
-        cantidad: cantidad,
-        motivo: motivo,
-        notas: notas,
-        usuario: usuario,
-        timestamp: Date.now()
-      }).then(() => {
-        cantidadInput.value = '';
-        document.getElementById('movNotasInput').value = '';
-        toggleModal('modalMovimiento', false);
-      });
     };
+
+    function finalizarMovimiento() {
+      document.getElementById('movCantidadInput').value = '';
+      document.getElementById('movNotasInput').value = '';
+      toggleModal('modalMovimiento', false);
+    }
 
     window.guardarFlete = function() {
       const transportista = document.getElementById('fleteTransportista').value.trim();
@@ -148,13 +184,7 @@
 
       const nuevoFleteRef = push(fletesRef);
       set(nuevoFleteRef, {
-        transportista,
-        chofer,
-        guia,
-        destino,
-        cantidad,
-        costo,
-        estadoPago,
+        transportista, chofer, guia, destino, cantidad, costo, estadoPago,
         timestamp: Date.now()
       }).then(() => {
         document.getElementById('fleteTransportista').value = '';
@@ -223,7 +253,6 @@
 
     <!-- SECCIÓN 1: CORRALES -->
     <div id="seccionCorrales" class="space-y-4">
-      <!-- Botones Rápidos -->
       <section class="grid grid-cols-2 gap-4">
         <button onclick="abrirModalMovimiento('SUMAR')" class="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold p-3 rounded-xl shadow flex flex-col items-center justify-center gap-1">
           <i class="fa-solid fa-circle-plus text-2xl"></i>
@@ -243,20 +272,18 @@
       </section>
     </div>
 
-    <!-- SECCIÓN 2: FLETES Y LOGÍSTICA (Oculta por defecto) -->
+    <!-- SECCIÓN 2: FLETES -->
     <div id="seccionFletes" class="space-y-4 hidden">
       <div class="flex justify-between items-center">
         <h2 class="text-md font-bold text-slate-700 flex items-center gap-2">
           <i class="fa-solid fa-truck-moving"></i> Registro de Transportes y DTE
         </h2>
-        <button onclick="toggleModal('modalFlete', true)" class="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold">
-          + Nuevo Flete
-        </button>
+        <button onclick="toggleModal('modalFlete', true)" class="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold">+ Nuevo Flete</button>
       </div>
       <div id="listaFletes" class="space-y-3"></div>
     </div>
 
-    <!-- SECCIÓN 3: HISTORIAL (Oculta por defecto) -->
+    <!-- SECCIÓN 3: HISTORIAL -->
     <div id="seccionHistorial" class="space-y-4 hidden">
       <h2 class="text-md font-bold text-slate-700 flex items-center gap-2">
         <i class="fa-solid fa-clock-rotate-left"></i> Historial de Movimientos de Hacienda
@@ -281,21 +308,28 @@
     </div>
   </div>
 
-  <!-- MODAL MOVIMIENTO DE VACAS -->
+  <!-- MODAL MOVIMIENTO -->
   <div id="modalMovimiento" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
     <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-3">
       <h3 id="modalMovTitle" class="text-lg font-bold text-slate-800">Movimiento</h3>
-      <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">Corral</label>
+      <div id="contenedorCorralOrigen">
+        <label id="labelCorralOrigen" class="block text-xs font-medium text-slate-600 mb-1">Corral</label>
         <select id="movCorralSelect" class="w-full border rounded-lg p-3 text-sm bg-white outline-none"></select>
       </div>
+      
+      <!-- Selector de Corral Destino (Aparece solo si es Traslado) -->
+      <div id="divCorralDestino" class="hidden bg-blue-50 p-3 rounded-xl border border-blue-200 space-y-1">
+        <label class="block text-xs font-bold text-blue-800 mb-1"><i class="fa-solid fa-arrow-right-arrow-left"></i> ¿A qué corral van?</label>
+        <select id="movCorralDestinoSelect" class="w-full border rounded-lg p-2.5 text-sm bg-white outline-none"></select>
+      </div>
+
       <div>
         <label class="block text-xs font-medium text-slate-600 mb-1">Cantidad de Animales</label>
         <input type="number" id="movCantidadInput" placeholder="Ej: 15" min="1" class="w-full border rounded-lg p-3 text-sm outline-none">
       </div>
-      <div>
+      <div id="contenedorMotivo">
         <label class="block text-xs font-medium text-slate-600 mb-1">Motivo</label>
-        <select id="movMotivoSelect" class="w-full border rounded-lg p-3 text-sm bg-white outline-none">
+        <select id="movMotivoSelect" onchange="verificarMotivoTraslado()" class="w-full border rounded-lg p-3 text-sm bg-white outline-none">
           <option value="Venta">Venta</option>
           <option value="Muerte">Muerte / Baja</option>
           <option value="Nacimiento">Nacimiento</option>
@@ -310,7 +344,7 @@
       </div>
       <div>
         <label class="block text-xs font-medium text-slate-600 mb-1">Notas / Observaciones</label>
-        <input type="text" id="movNotasInput" placeholder="Ej: Comprador Pérez" class="w-full border rounded-lg p-3 text-sm outline-none">
+        <input type="text" id="movNotasInput" placeholder="Ej: Observaciones" class="w-full border rounded-lg p-3 text-sm outline-none">
       </div>
       <div class="flex justify-end gap-3 pt-2">
         <button onclick="toggleModal('modalMovimiento', false)" class="px-4 py-2 text-slate-600 font-semibold text-sm">Cancelar</button>
@@ -319,7 +353,7 @@
     </div>
   </div>
 
-  <!-- MODAL REGISTRAR FLETE -->
+  <!-- MODAL FLETE -->
   <div id="modalFlete" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
     <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-3">
       <h3 class="text-lg font-bold text-slate-800"><i class="fa-solid fa-truck text-blue-600"></i> Registrar Flete / Camión</h3>
@@ -368,7 +402,6 @@
   </div>
 
   <script>
-    // Control de Pestañas
     window.cambiarTab = function(tab) {
       document.getElementById('seccionCorrales').classList.add('hidden');
       document.getElementById('seccionFletes').classList.add('hidden');
@@ -396,6 +429,16 @@
       else modal.classList.add('hidden');
     }
 
+    window.verificarMotivoTraslado = function() {
+      const motivo = document.getElementById('movMotivoSelect').value;
+      const divDestino = document.getElementById('divCorralDestino');
+      if (motivo === 'Traslado') {
+        divDestino.classList.remove('hidden');
+      } else {
+        divDestino.classList.add('hidden');
+      }
+    };
+
     function abrirModalMovimiento(tipo) {
       const ids = Object.keys(window.corralesData || {});
       if (ids.length === 0) {
@@ -404,13 +447,25 @@
       }
       const title = document.getElementById('modalMovTitle');
       const btn = document.getElementById('btnConfirmarMovimiento');
+      const contenedorMotivo = document.getElementById('contenedorMotivo');
+      const labelOrigen = document.getElementById('labelCorralOrigen');
+
+      populateSelects();
 
       if (tipo === 'SUMAR') {
         title.innerText = "Ingresar / Sumar Animales";
+        labelOrigen.innerText = "Corral de Destino";
+        contenedorMotivo.style.display = 'block';
+        document.getElementById('divCorralDestino').classList.add('hidden');
+        document.getElementById('movMotivoSelect').value = 'Compra';
         btn.className = "bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-lg font-bold text-sm";
         btn.onclick = () => registrarMovimiento('SUMAR');
       } else {
-        title.innerText = "Egresar / Restar Animales";
+        title.innerText = "Egresar / Restar o Trasladar";
+        labelOrigen.innerText = "Corral de Origen (Sacar de aquí)";
+        contenedorMotivo.style.display = 'block';
+        document.getElementById('movMotivoSelect').value = 'Venta';
+        verificarMotivoTraslado();
         btn.className = "bg-rose-600 hover:bg-rose-700 text-white px-5 py-2 rounded-lg font-bold text-sm";
         btn.onclick = () => registrarMovimiento('RESTAR');
       }
@@ -459,10 +514,14 @@
 
     function populateSelects() {
       const select = document.getElementById('movCorralSelect');
+      const selectDestino = document.getElementById('movCorralDestinoSelect');
       const corrales = window.corralesData || {};
-      select.innerHTML = Object.keys(corrales).map(id => 
+      const opciones = Object.keys(corrales).map(id => 
         `<option value="${id}">${corrales[id].nombre} (${corrales[id].cantidad} cabezas)</option>`
       ).join('');
+      
+      select.innerHTML = opciones;
+      if (selectDestino) selectDestino.innerHTML = opciones;
     }
 
     function renderHistorial() {
