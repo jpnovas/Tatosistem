@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Control de Ganado y Fletes - Campo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+
+  <!-- Firebase App & Realtime Database SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, onValue, set, push, remove } 
+      from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    // ==========================================
+    // CONFIGURACIÓN DE FIREBASE (Reemplazar con tus datos)
+    // ==========================================
+    const firebaseConfig = {
+    apiKey: "AIzaSyAcnfJFlnJKEtX_T1RDarphX2Be2rX8tEg",
+    authDomain: "tatocows.firebaseapp.com",
+    databaseURL: "https://tatocows-default-rtdb.firebaseio.com",
+    projectId: "tatocows",
+    storageBucket: "tatocows.firebasestorage.app",
+    messagingSenderId: "145845925802",
+    appId: "1:145845925802:web:40baed1fdbeb90b4991dd3",
+    measurementId: "G-3M1F1362RN"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // Referencias a los nodos
+    const corralesRef = ref(db, 'corrales');
+    const historialRef = ref(db, 'historial');
+    const fletesRef = ref(db, 'fletes');
+
+    // Variables globales de estado local
+    window.corralesData = {};
+    window.historialData = [];
+    window.fletesData = [];
+
+    // Escuchar Corrales
+    onValue(corralesRef, (snapshot) => {
+      const data = snapshot.val() || {};
+      window.corralesData = data;
+      renderCorrales();
+      renderStats();
+      populateSelects();
+    });
+
+    // Escuchar Historial
+    onValue(historialRef, (snapshot) => {
+      const data = snapshot.val() || {};
+      window.historialData = Object.keys(data).map(key => ({ id: key, ...data[key] }));
+      window.historialData.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+      renderHistorial();
+    });
+
+    // Escuchar Fletes
+    onValue(fletesRef, (snapshot) => {
+      const data = snapshot.val() || {};
+      window.fletesData = Object.keys(data).map(key => ({ id: key, ...data[key] }));
+      window.fletesData.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+      renderFletes();
+      renderStats();
+    });
+
+    // Funciones globales de base de datos
+    window.crearCorral = function() {
+      const input = document.getElementById('nombreCorralInput');
+      const nombre = input.value.trim();
+      if (!nombre) return;
+
+      const newCorralRef = push(corralesRef);
+      set(newCorralRef, { nombre: nombre, cantidad: 0 }).then(() => {
+        input.value = '';
+        toggleModal('modalNuevoCorral', false);
+      });
+    };
+
+    window.eliminarCorral = function(id, nombre) {
+      if (confirm(`¿Estás seguro de eliminar el corral "${nombre}"?`)) {
+        remove(ref(db, `corrales/${id}`));
+      }
+    };
+
+    window.registrarMovimiento = function(tipo) {
+      const corralId = document.getElementById('movCorralSelect').value;
+      const cantidadInput = document.getElementById('movCantidadInput');
+      const motivo = document.getElementById('movMotivoSelect').value;
+      const notas = document.getElementById('movNotasInput').value.trim();
+      const usuario = document.getElementById('movUsuarioInput').value.trim() || 'Operador';
+
+      const cantidad = parseInt(cantidadInput.value, 10);
+      if (!corralId || isNaN(cantidad) || cantidad <= 0) {
+        alert("Ingresá una cantidad válida mayor a 0");
+        return;
+      }
+
+      const corralActual = window.corralesData[corralId];
+      if (!corralActual) return;
+
+      let nuevaCantidad = corralActual.cantidad;
+      if (tipo === 'SUMAR') {
+        nuevaCantidad += cantidad;
+      } else {
+        if (cantidad > corralActual.cantidad) {
+          if (!confirm(`La cantidad a restar (${cantidad}) supera las vacas en el corral (${corralActual.cantidad}). ¿Continuar de todos modos?`)) {
+            return;
+          }
+        }
+        nuevaCantidad = Math.max(0, nuevaCantidad - cantidad);
+      }
+
+      set(ref(db, `corrales/${corralId}/cantidad`), nuevaCantidad);
+
+      const nuevoMovRef = push(historialRef);
+      set(nuevoMovRef, {
+        corralId: corralId,
+        nombreCorral: corralActual.nombre,
+        tipo: tipo,
+        cantidad: cantidad,
+        motivo: motivo,
+        notas: notas,
+        usuario: usuario,
+        timestamp: Date.now()
+      }).then(() => {
+        cantidadInput.value = '';
+        document.getElementById('movNotasInput').value = '';
+        toggleModal('modalMovimiento', false);
+      });
+    };
+
+    window.guardarFlete = function() {
+      const transportista = document.getElementById('fleteTransportista').value.trim();
+      const chofer = document.getElementById('fleteChofer').value.trim();
+      const guia = document.getElementById('fleteGuia').value.trim();
+      const destino = document.getElementById('fleteDestino').value.trim();
+      const cantidad = parseInt(document.getElementById('fleteCantidad').value, 10);
+      const costo = parseFloat(document.getElementById('fleteCosto').value) || 0;
+      const estadoPago = document.getElementById('fleteEstadoPago').value;
+
+      if (!transportista || isNaN(cantidad) || cantidad <= 0) {
+        alert("Completá al menos el transportista y la cantidad de animales.");
+        return;
+      }
+
+      const nuevoFleteRef = push(fletesRef);
+      set(nuevoFleteRef, {
+        transportista,
+        chofer,
+        guia,
+        destino,
+        cantidad,
+        costo,
+        estadoPago,
+        timestamp: Date.now()
+      }).then(() => {
+        document.getElementById('fleteTransportista').value = '';
+        document.getElementById('fleteChofer').value = '';
+        document.getElementById('fleteGuia').value = '';
+        document.getElementById('fleteDestino').value = '';
+        document.getElementById('fleteCantidad').value = '';
+        document.getElementById('fleteCosto').value = '';
+        toggleModal('modalFlete', false);
+      });
+    };
+
+    window.eliminarFlete = function(id) {
+      if (confirm("¿Eliminar este registro de flete?")) {
+        remove(ref(db, `fletes/${id}`));
+      }
+    };
+  </script>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen pb-20">
+
+  <!-- Encabezado Principal -->
+  <header class="bg-emerald-700 text-white p-4 shadow-md sticky top-0 z-10">
+    <div class="max-w-3xl mx-auto flex justify-between items-center">
+      <div>
+        <h1 class="text-xl font-bold flex items-center gap-2">
+          <i class="fa-solid font-bold fa-cow"></i> Control de Ganado
+        </h1>
+        <p class="text-xs text-emerald-200">Sincronizado en tiempo real (Nube)</p>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="toggleModal('modalFlete', true)" class="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-semibold py-2 px-3 rounded-lg flex items-center gap-1 shadow">
+          <i class="fa-solid fa-truck"></i> Flete
+        </button>
+        <button onclick="toggleModal('modalNuevoCorral', true)" class="bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white text-xs font-semibold py-2 px-3 rounded-lg flex items-center gap-1 shadow">
+          <i class="fa-solid fa-plus"></i> Corral
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-3xl mx-auto p-4 space-y-6">
+
+    <!-- Pestañas de Navegación Visual -->
+    <div class="flex bg-white rounded-xl shadow p-1 gap-1">
+      <button onclick="cambiarTab('corrales')" id="btnTabCorrales" class="flex-1 py-2 font-bold text-sm rounded-lg bg-emerald-600 text-white transition">Corrales & Stock</button>
+      <button onclick="cambiarTab('fletes')" id="btnTabFletes" class="flex-1 py-2 font-bold text-sm rounded-lg text-slate-600 transition">Fletes y Guías</button>
+      <button onclick="cambiarTab('historial')" id="btnTabHistorial" class="flex-1 py-2 font-bold text-sm rounded-lg text-slate-600 transition">Historial</button>
+    </div>
+
+    <!-- TARJETAS DE RESUMEN -->
+    <section class="grid grid-cols-3 gap-3">
+      <div class="bg-white p-3 rounded-xl shadow border-l-4 border-emerald-600">
+        <p class="text-[10px] font-bold text-slate-400 uppercase">Cabezas</p>
+        <p id="statTotalVacas" class="text-2xl font-black text-slate-800">0</p>
+      </div>
+      <div class="bg-white p-3 rounded-xl shadow border-l-4 border-blue-600">
+        <p class="text-[10px] font-bold text-slate-400 uppercase">Corrales</p>
+        <p id="statTotalCorrales" class="text-2xl font-black text-slate-800">0</p>
+      </div>
+      <div class="bg-white p-3 rounded-xl shadow border-l-4 border-amber-500">
+        <p class="text-[10px] font-bold text-slate-400 uppercase">Fletes</p>
+        <p id="statTotalFletes" class="text-2xl font-black text-slate-800">0</p>
+      </div>
+    </section>
+
+    <!-- SECCIÓN 1: CORRALES -->
+    <div id="seccionCorrales" class="space-y-4">
+      <!-- Botones Rápidos -->
+      <section class="grid grid-cols-2 gap-4">
+        <button onclick="abrirModalMovimiento('SUMAR')" class="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold p-3 rounded-xl shadow flex flex-col items-center justify-center gap-1">
+          <i class="fa-solid fa-circle-plus text-2xl"></i>
+          <span class="text-sm">INGRESAR / SUMAR</span>
+        </button>
+        <button onclick="abrirModalMovimiento('RESTAR')" class="bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold p-3 rounded-xl shadow flex flex-col items-center justify-center gap-1">
+          <i class="fa-solid fa-circle-minus text-2xl"></i>
+          <span class="text-sm">EGRESAR / RESTAR</span>
+        </button>
+      </section>
+
+      <section>
+        <h2 class="text-md font-bold text-slate-700 mb-3 flex items-center gap-2">
+          <i class="fa-solid fa-layer-group"></i> Estado Actual de Corrales
+        </h2>
+        <div id="listaCorrales" class="space-y-3"></div>
+      </section>
+    </div>
+
+    <!-- SECCIÓN 2: FLETES Y LOGÍSTICA (Oculta por defecto) -->
+    <div id="seccionFletes" class="space-y-4 hidden">
+      <div class="flex justify-between items-center">
+        <h2 class="text-md font-bold text-slate-700 flex items-center gap-2">
+          <i class="fa-solid fa-truck-moving"></i> Registro de Transportes y DTE
+        </h2>
+        <button onclick="toggleModal('modalFlete', true)" class="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold">
+          + Nuevo Flete
+        </button>
+      </div>
+      <div id="listaFletes" class="space-y-3"></div>
+    </div>
+
+    <!-- SECCIÓN 3: HISTORIAL (Oculta por defecto) -->
+    <div id="seccionHistorial" class="space-y-4 hidden">
+      <h2 class="text-md font-bold text-slate-700 flex items-center gap-2">
+        <i class="fa-solid fa-clock-rotate-left"></i> Historial de Movimientos de Hacienda
+      </h2>
+      <div id="listaHistorial" class="bg-white rounded-xl shadow divide-y divide-slate-100 max-h-96 overflow-y-auto"></div>
+    </div>
+
+  </main>
+
+  <!-- MODAL NUEVO CORRAL -->
+  <div id="modalNuevoCorral" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4">
+      <h3 class="text-lg font-bold text-slate-800">Agregar Nuevo Corral</h3>
+      <div>
+        <label class="block text-sm font-medium text-slate-600 mb-1">Nombre o Número</label>
+        <input type="text" id="nombreCorralInput" placeholder="Ej: Corral 1, Potrero Bajo" class="w-full border rounded-lg p-3 text-base focus:ring-2 focus:ring-emerald-500 outline-none">
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button onclick="toggleModal('modalNuevoCorral', false)" class="px-4 py-2 text-slate-600 font-semibold">Cancelar</button>
+        <button onclick="crearCorral()" class="bg-emerald-600 text-white px-5 py-2 rounded-lg font-bold">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL MOVIMIENTO DE VACAS -->
+  <div id="modalMovimiento" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-3">
+      <h3 id="modalMovTitle" class="text-lg font-bold text-slate-800">Movimiento</h3>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Corral</label>
+        <select id="movCorralSelect" class="w-full border rounded-lg p-3 text-sm bg-white outline-none"></select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Cantidad de Animales</label>
+        <input type="number" id="movCantidadInput" placeholder="Ej: 15" min="1" class="w-full border rounded-lg p-3 text-sm outline-none">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Motivo</label>
+        <select id="movMotivoSelect" class="w-full border rounded-lg p-3 text-sm bg-white outline-none">
+          <option value="Venta">Venta</option>
+          <option value="Muerte">Muerte / Baja</option>
+          <option value="Nacimiento">Nacimiento</option>
+          <option value="Compra">Compra / Ingreso</option>
+          <option value="Traslado">Traslado entre corrales</option>
+          <option value="Recuento">Ajuste de Recuento</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Registra (Opcional)</label>
+        <input type="text" id="movUsuarioInput" placeholder="Ej: Juan" class="w-full border rounded-lg p-3 text-sm outline-none">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Notas / Observaciones</label>
+        <input type="text" id="movNotasInput" placeholder="Ej: Comprador Pérez" class="w-full border rounded-lg p-3 text-sm outline-none">
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button onclick="toggleModal('modalMovimiento', false)" class="px-4 py-2 text-slate-600 font-semibold text-sm">Cancelar</button>
+        <button id="btnConfirmarMovimiento" class="text-white px-5 py-2 rounded-lg font-bold text-sm">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL REGISTRAR FLETE -->
+  <div id="modalFlete" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-3">
+      <h3 class="text-lg font-bold text-slate-800"><i class="fa-solid fa-truck text-blue-600"></i> Registrar Flete / Camión</h3>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Empresa / Transportista</label>
+        <input type="text" id="fleteTransportista" placeholder="Ej: Transportes El Ruso" class="w-full border rounded-lg p-3 text-sm outline-none">
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Chofer</label>
+          <input type="text" id="fleteChofer" placeholder="Nombre" class="w-full border rounded-lg p-2.5 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Guía / DTE (SENASA)</label>
+          <input type="text" id="fleteGuia" placeholder="Nro de Guía" class="w-full border rounded-lg p-2.5 text-sm outline-none">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Cantidad de Animales</label>
+          <input type="number" id="fleteCantidad" placeholder="Ej: 30" class="w-full border rounded-lg p-2.5 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Costo ($)</label>
+          <input type="number" id="fleteCosto" placeholder="Ej: 150000" class="w-full border rounded-lg p-2.5 text-sm outline-none">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Destino / Origen</label>
+          <input type="text" id="fleteDestino" placeholder="Ej: Frigorífico / Feria" class="w-full border rounded-lg p-2.5 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Estado del Pago</label>
+          <select id="fleteEstadoPago" class="w-full border rounded-lg p-2.5 text-sm bg-white outline-none">
+            <option value="Pendiente">Pendiente</option>
+            <option value="Pagado">Pagado</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button onclick="toggleModal('modalFlete', false)" class="px-4 py-2 text-slate-600 font-semibold text-sm">Cancelar</button>
+        <button onclick="guardarFlete()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-bold text-sm">Guardar Flete</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Control de Pestañas
+    window.cambiarTab = function(tab) {
+      document.getElementById('seccionCorrales').classList.add('hidden');
+      document.getElementById('seccionFletes').classList.add('hidden');
+      document.getElementById('seccionHistorial').classList.add('hidden');
+
+      document.getElementById('btnTabCorrales').className = "flex-1 py-2 font-bold text-sm rounded-lg text-slate-600 transition";
+      document.getElementById('btnTabFletes').className = "flex-1 py-2 font-bold text-sm rounded-lg text-slate-600 transition";
+      document.getElementById('btnTabHistorial').className = "flex-1 py-2 font-bold text-sm rounded-lg text-slate-600 transition";
+
+      if (tab === 'corrales') {
+        document.getElementById('seccionCorrales').classList.remove('hidden');
+        document.getElementById('btnTabCorrales').className = "flex-1 py-2 font-bold text-sm rounded-lg bg-emerald-600 text-white transition";
+      } else if (tab === 'fletes') {
+        document.getElementById('seccionFletes').classList.remove('hidden');
+        document.getElementById('btnTabFletes').className = "flex-1 py-2 font-bold text-sm rounded-lg bg-blue-600 text-white transition";
+      } else if (tab === 'historial') {
+        document.getElementById('seccionHistorial').classList.remove('hidden');
+        document.getElementById('btnTabHistorial').className = "flex-1 py-2 font-bold text-sm rounded-lg bg-slate-700 text-white transition";
+      }
+    };
+
+    function toggleModal(id, show) {
+      const modal = document.getElementById(id);
+      if (show) modal.classList.remove('hidden');
+      else modal.classList.add('hidden');
+    }
+
+    function abrirModalMovimiento(tipo) {
+      const ids = Object.keys(window.corralesData || {});
+      if (ids.length === 0) {
+        alert("Primero debés crear al menos un corral.");
+        return;
+      }
+      const title = document.getElementById('modalMovTitle');
+      const btn = document.getElementById('btnConfirmarMovimiento');
+
+      if (tipo === 'SUMAR') {
+        title.innerText = "Ingresar / Sumar Animales";
+        btn.className = "bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-lg font-bold text-sm";
+        btn.onclick = () => registrarMovimiento('SUMAR');
+      } else {
+        title.innerText = "Egresar / Restar Animales";
+        btn.className = "bg-rose-600 hover:bg-rose-700 text-white px-5 py-2 rounded-lg font-bold text-sm";
+        btn.onclick = () => registrarMovimiento('RESTAR');
+      }
+      toggleModal('modalMovimiento', true);
+    }
+
+    function renderStats() {
+      const corrales = window.corralesData || {};
+      const fletes = window.fletesData || [];
+      const keys = Object.keys(corrales);
+      let totalVacas = 0;
+      keys.forEach(k => { totalVacas += (corrales[k].cantidad || 0); });
+
+      document.getElementById('statTotalVacas').innerText = totalVacas;
+      document.getElementById('statTotalCorrales').innerText = keys.length;
+      document.getElementById('statTotalFletes').innerText = fletes.length;
+    }
+
+    function renderCorrales() {
+      const container = document.getElementById('listaCorrales');
+      const corrales = window.corralesData || {};
+      const keys = Object.keys(corrales);
+
+      if (keys.length === 0) {
+        container.innerHTML = `<div class="bg-white p-6 rounded-xl text-center text-slate-400 text-sm">No hay corrales registrados. Creá el primero arriba con "+ Corral".</div>`;
+        return;
+      }
+
+      container.innerHTML = keys.map(id => {
+        const c = corrales[id];
+        return `
+          <div class="bg-white p-4 rounded-xl shadow flex items-center justify-between">
+            <div>
+              <h3 class="font-bold text-base text-slate-800">${c.nombre}</h3>
+            </div>
+            <div class="flex items-center gap-4">
+              <span class="text-xl font-black text-emerald-700">${c.cantidad} <span class="text-xs font-normal text-slate-500">cabezas</span></span>
+              <button onclick="eliminarCorral('${id}', '${c.nombre}')" class="text-slate-300 hover:text-rose-500 p-2">
+                <i class="fa-solid fa-trash text-sm"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function populateSelects() {
+      const select = document.getElementById('movCorralSelect');
+      const corrales = window.corralesData || {};
+      select.innerHTML = Object.keys(corrales).map(id => 
+        `<option value="${id}">${corrales[id].nombre} (${corrales[id].cantidad} cabezas)</option>`
+      ).join('');
+    }
+
+    function renderHistorial() {
+      const container = document.getElementById('listaHistorial');
+      const list = window.historialData || [];
+
+      if (list.length === 0) {
+        container.innerHTML = `<div class="p-4 text-center text-slate-400 text-sm">Sin movimientos registrados aún.</div>`;
+        return;
+      }
+
+      container.innerHTML = list.map(h => {
+        const fecha = h.timestamp ? new Date(h.timestamp).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : 'Reciente';
+        const esSuma = h.tipo === 'SUMAR';
+        const colorClass = esSuma ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50';
+        const signo = esSuma ? '+' : '-';
+
+        return `
+          <div class="p-3 flex items-center justify-between text-sm">
+            <div class="flex items-center gap-3">
+              <span class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs ${colorClass}">
+                ${signo}
+              </span>
+              <div>
+                <p class="font-semibold text-slate-800">${h.nombreCorral} &bull; <span class="text-slate-500 font-normal">${h.motivo}</span></p>
+                <p class="text-xs text-slate-400">${fecha} ${h.usuario ? '&bull; ' + h.usuario : ''} ${h.notas ? '&bull; ' + h.notas : ''}</p>
+              </div>
+            </div>
+            <span class="font-bold text-base ${esSuma ? 'text-emerald-600' : 'text-rose-600'}">
+              ${signo}${h.cantidad}
+            </span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderFletes() {
+      const container = document.getElementById('listaFletes');
+      const list = window.fletesData || [];
+
+      if (list.length === 0) {
+        container.innerHTML = `<div class="bg-white p-6 rounded-xl text-center text-slate-400 text-sm">No hay fletes registrados.</div>`;
+        return;
+      }
+
+      container.innerHTML = list.map(f => {
+        const fecha = f.timestamp ? new Date(f.timestamp).toLocaleDateString('es-AR') : 'Reciente';
+        const pagoClase = f.estadoPago === 'Pagado' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800';
+
+        return `
+          <div class="bg-white p-4 rounded-xl shadow space-y-2 text-sm">
+            <div class="flex justify-between items-start">
+              <div>
+                <h3 class="font-bold text-base text-slate-800"><i class="fa-solid fa-truck text-blue-600 mr-1"></i> ${f.transportista}</h3>
+                <p class="text-xs text-slate-500">Fecha: ${fecha} ${f.chofer ? '&bull; Chofer: ' + f.chofer : ''}</p>
+              </div>
+              <button onclick="eliminarFlete('${f.id}')" class="text-slate-300 hover:text-rose-500 p-1">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </div>
+            <div class="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-lg text-xs">
+              <div><span class="text-slate-400">Guía DTE:</span> <strong class="text-slate-700">${f.guia || 'N/D'}</strong></div>
+              <div><span class="text-slate-400">Cantidad:</span> <strong class="text-emerald-700">${f.cantidad} cabezas</strong></div>
+              <div><span class="text-slate-400">Destino:</span> <strong class="text-slate-700">${f.destino || 'N/D'}</strong></div>
+              <div><span class="text-slate-400">Costo:</span> <strong class="text-slate-700">$${f.costo.toLocaleString()}</strong></div>
+            </div>
+            <div class="flex justify-end pt-1">
+              <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full ${pagoClase}">Pago: ${f.estadoPago}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  </script>
+</body>
+</html>
