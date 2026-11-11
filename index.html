@@ -7,10 +7,10 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
 
-  <!-- Firebase App & Realtime Database SDKs con soporte Offline -->
+  <!-- Firebase App & Realtime Database SDKs -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getDatabase, ref, onValue, set, push, remove, goOffline, goOnline } 
+    import { getDatabase, ref, onValue, set, push, remove } 
       from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
     // ==========================================
@@ -38,16 +38,17 @@
     window.historialData = [];
     window.fletesData = [];
 
-    // Detector de estado de red
+    // Detector de estado de red visual
     window.addEventListener('online', () => {
-      document.getElementById('estadoConexion').className = "hidden";
-      goOnline(db);
+      const banner = document.getElementById('estadoConexion');
+      if(banner) banner.className = "hidden";
     });
     window.addEventListener('offline', () => {
       const banner = document.getElementById('estadoConexion');
-      banner.innerText = "Sin conexión - Trabajando localmente";
-      banner.className = "bg-amber-500 text-white text-center text-xs py-1 font-bold";
-      goOffline(db);
+      if(banner) {
+        banner.innerText = "Sin conexión - Trabajando localmente";
+        banner.className = "bg-amber-500 text-white text-center text-xs py-1 font-bold";
+      }
     });
 
     onValue(corralesRef, (snapshot) => {
@@ -85,7 +86,8 @@
     };
 
     window.eliminarCorral = function(id, nombre) {
-      if (confirm(`¿Estás seguro de eliminar el corral "${nombre}"?`)) { remove(ref(db, `corrales/${id}`));
+      if (confirm(`¿Estás seguro de eliminar el corral "${nombre}"?`)) {
+        remove(ref(db, `corrales/${id}`));
       }
     };
 
@@ -142,7 +144,39 @@
         const nuevaCantidadDestino = corralDestino.cantidad + cantidad;
 
         set(ref(db, `corrales/${corralId}/cantidad`), nuevaCantidadOrigen);
-        set(ref(db, `corrales/${corralDestinoId}/cantidad`), nuevaCantidadDestino);  const timestamp = Date.now();  // Registro de salida en origen const movOrigenRef = push(historialRef); set(movOrigenRef, { corralId: corralId, nombreCorral: corralActual.nombre, tipo: 'RESTAR', cantidad: cantidad, motivo: 'Traslado', notas: `Hacia ${corralDestino.nombre} ${notas ? '- ' + notas : ''}`, usuario: usuario, timestamp: timestamp });  // Registro de entrada en destino const movDestinoRef = push(historialRef); set(movDestinoRef, { corralId: corralDestinoId, nombreCorral: corralDestino.nombre, tipo: 'SUMAR', cantidad: cantidad, motivo: 'Traslado (Entrada)', notas: `Desde ${corralActual.nombre} ${notas ? '- ' + notas : ''}`, usuario: usuario, timestamp: timestamp + 1 }).then(() => finalizarMovimiento());  } else if (accionFormulario === 'SUMAR') { const nuevaCantidad = corralActual.cantidad + cantidad; set(ref(db, `corrales/${corralId}/cantidad`), nuevaCantidad);
+        set(ref(db, `corrales/${corralDestinoId}/cantidad`), nuevaCantidadDestino);
+
+        const timestamp = Date.now();
+
+        // Registro de salida en origen
+        const movOrigenRef = push(historialRef);
+        set(movOrigenRef, {
+          corralId: corralId,
+          nombreCorral: corralActual.nombre,
+          tipo: 'RESTAR',
+          cantidad: cantidad,
+          motivo: 'Traslado',
+          notas: `Hacia ${corralDestino.nombre} ${notas ? '- ' + notas : ''}`,
+          usuario: usuario,
+          timestamp: timestamp
+        });
+
+        // Registro de entrada en destino
+        const movDestinoRef = push(historialRef);
+        set(movDestinoRef, {
+          corralId: corralDestinoId,
+          nombreCorral: corralDestino.nombre,
+          tipo: 'SUMAR',
+          cantidad: cantidad,
+          motivo: 'Traslado (Entrada)',
+          notas: `Desde ${corralActual.nombre} ${notas ? '- ' + notas : ''}`,
+          usuario: usuario,
+          timestamp: timestamp + 1
+        }).then(() => finalizarMovimiento());
+
+      } else if (accionFormulario === 'SUMAR') {
+        const nuevaCantidad = corralActual.cantidad + cantidad;
+        set(ref(db, `corrales/${corralId}/cantidad`), nuevaCantidad);
 
         const nuevoMovRef = push(historialRef);
         set(nuevoMovRef, {
@@ -165,7 +199,60 @@
         }
 
         const nuevaCantidad = Math.max(0, corralActual.cantidad - cantidad);
-        set(ref(db, `corrales/${corralId}/cantidad`), nuevaCantidad);  const nuevoMovRef = push(historialRef); set(nuevoMovRef, { corralId: corralId, nombreCorral: corralActual.nombre, tipo: 'RESTAR', cantidad: cantidad, motivo: motivo, notas: notas, usuario: usuario, timestamp: Date.now() }).then(() => finalizarMovimiento()); } };  function finalizarMovimiento() { document.getElementById('movCantidadInput').value = ''; document.getElementById('movNotasInput').value = ''; toggleModal('modalMovimiento', false); }  window.guardarFlete = function() { const transportista = document.getElementById('fleteTransportista').value.trim(); const chofer = document.getElementById('fleteChofer').value.trim(); const guia = document.getElementById('fleteGuia').value.trim(); const destino = document.getElementById('fleteDestino').value.trim(); const cantidad = parseInt(document.getElementById('fleteCantidad').value, 10); const costo = parseFloat(document.getElementById('fleteCosto').value) \vert{}\vert{} 0; const estadoPago = document.getElementById('fleteEstadoPago').value;  if (!transportista \vert{}\vert{} isNaN(cantidad) \vert{}\vert{} cantidad <= 0) { alert("Completá al menos el transportista y la cantidad de animales."); return; }  const nuevoFleteRef = push(fletesRef); set(nuevoFleteRef, { transportista, chofer, guia, destino, cantidad, costo, estadoPago, timestamp: Date.now() }).then(() => { document.getElementById('fleteTransportista').value = ''; document.getElementById('fleteChofer').value = ''; document.getElementById('fleteGuia').value = ''; document.getElementById('fleteDestino').value = ''; document.getElementById('fleteCantidad').value = ''; document.getElementById('fleteCosto').value = ''; toggleModal('modalFlete', false); }); };  window.eliminarFlete = function(id) { if (confirm("¿Eliminar este registro de flete?")) { remove(ref(db, `fletes/${id}`));
+        set(ref(db, `corrales/${corralId}/cantidad`), nuevaCantidad);
+
+        const nuevoMovRef = push(historialRef);
+        set(nuevoMovRef, {
+          corralId: corralId,
+          nombreCorral: corralActual.nombre,
+          tipo: 'RESTAR',
+          cantidad: cantidad,
+          motivo: motivo,
+          notas: notas,
+          usuario: usuario,
+          timestamp: Date.now()
+        }).then(() => finalizarMovimiento());
+      }
+    };
+
+    function finalizarMovimiento() {
+      document.getElementById('movCantidadInput').value = '';
+      document.getElementById('movNotasInput').value = '';
+      toggleModal('modalMovimiento', false);
+    }
+
+    window.guardarFlete = function() {
+      const transportista = document.getElementById('fleteTransportista').value.trim();
+      const chofer = document.getElementById('fleteChofer').value.trim();
+      const guia = document.getElementById('fleteGuia').value.trim();
+      const destino = document.getElementById('fleteDestino').value.trim();
+      const cantidad = parseInt(document.getElementById('fleteCantidad').value, 10);
+      const costo = parseFloat(document.getElementById('fleteCosto').value) || 0;
+      const estadoPago = document.getElementById('fleteEstadoPago').value;
+
+      if (!transportista || isNaN(cantidad) || cantidad <= 0) {
+        alert("Completá al menos el transportista y la cantidad de animales.");
+        return;
+      }
+
+      const nuevoFleteRef = push(fletesRef);
+      set(nuevoFleteRef, {
+        transportista, chofer, guia, destino, cantidad, costo, estadoPago,
+        timestamp: Date.now()
+      }).then(() => {
+        document.getElementById('fleteTransportista').value = '';
+        document.getElementById('fleteChofer').value = '';
+        document.getElementById('fleteGuia').value = '';
+        document.getElementById('fleteDestino').value = '';
+        document.getElementById('fleteCantidad').value = '';
+        document.getElementById('fleteCosto').value = '';
+        toggleModal('modalFlete', false);
+      });
+    };
+
+    window.eliminarFlete = function(id) {
+      if (confirm("¿Eliminar este registro de flete?")) {
+        remove(ref(db, `fletes/${id}`));
       }
     };
   </script>
@@ -527,4 +614,58 @@
           <div class="p-3 flex items-center justify-between text-sm">
             <div class="flex items-center gap-3">
               <span class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs ${colorClass}">
-                ${
+                ${signo}
+              </span>
+              <div>
+                <p class="font-semibold text-slate-800">${h.nombreCorral} &bull; <span class="text-slate-500 font-normal">${h.motivo}</span></p>
+                <p class="text-xs text-slate-400">${fecha} ${h.usuario ? '&bull; ' + h.usuario : ''} ${h.notas ? '&bull; ' + h.notas : ''}</p>
+              </div>
+            </div>
+            <span class="font-bold text-base ${esSuma ? 'text-emerald-600' : 'text-rose-600'}">
+              ${signo}${h.cantidad}
+            </span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderFletes() {
+      const container = document.getElementById('listaFletes');
+      const list = window.fletesData || [];
+
+      if (list.length === 0) {
+        container.innerHTML = `<div class="bg-white p-6 rounded-xl text-center text-slate-400 text-sm">No hay fletes registrados.</div>`;
+        return;
+      }
+
+      container.innerHTML = list.map(f => {
+        const fecha = f.timestamp ? new Date(f.timestamp).toLocaleDateString('es-AR') : 'Reciente';
+        const pagoClase = f.estadoPago === 'Pagado' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800';
+
+        return `
+          <div class="bg-white p-4 rounded-xl shadow space-y-2 text-sm">
+            <div class="flex justify-between items-start">
+              <div>
+                <h3 class="font-bold text-base text-slate-800"><i class="fa-solid fa-truck text-blue-600 mr-1"></i> ${f.transportista}</h3>
+                <p class="text-xs text-slate-500">Fecha: ${fecha} ${f.chofer ? '&bull; Chofer: ' + f.chofer : ''}</p>
+              </div>
+              <button onclick="eliminarFlete('${f.id}')" class="text-slate-300 hover:text-rose-500 p-1">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </div>
+            <div class="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-lg text-xs">
+              <div><span class="text-slate-400">Guía DTE:</span> <strong class="text-slate-700">${f.guia || 'N/D'}</strong></div>
+              <div><span class="text-slate-400">Cantidad:</span> <strong class="text-emerald-700">${f.cantidad} cabezas</strong></div>
+              <div><span class="text-slate-400">Destino:</span> <strong class="text-slate-700">${f.destino || 'N/D'}</strong></div>
+              <div><span class="text-slate-400">Costo:</span> <strong class="text-slate-700">$${f.costo.toLocaleString()}</strong></div>
+            </div>
+            <div class="flex justify-end pt-1">
+              <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full ${pagoClase}">Pago: ${f.estadoPago}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  </script>
+</body>
+</html>
