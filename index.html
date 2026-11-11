@@ -79,10 +79,9 @@
       if (!nombre) return;
 
       const newCorralRef = push(corralesRef);
-      set(newCorralRef, { nombre: nombre, cantidad: 0 }).then(() => {
-        input.value = '';
-        toggleModal('modalNuevoCorral', false);
-      });
+      toggleModal('modalNuevoCorral', false);
+      set(newCorralRef, { nombre: nombre, cantidad: 0 });
+      input.value = '';
     };
 
     window.eliminarCorral = function(id, nombre) {
@@ -140,6 +139,8 @@
           }
         }
 
+        finalizarMovimiento();
+
         const nuevaCantidadOrigen = Math.max(0, corralActual.cantidad - cantidad);
         const nuevaCantidadDestino = corralDestino.cantidad + cantidad;
 
@@ -172,9 +173,10 @@
           notas: `Desde ${corralActual.nombre} ${notas ? '- ' + notas : ''}`,
           usuario: usuario,
           timestamp: timestamp + 1
-        }).then(() => finalizarMovimiento());
+        });
 
       } else if (accionFormulario === 'SUMAR') {
+        finalizarMovimiento();
         const nuevaCantidad = corralActual.cantidad + cantidad;
         set(ref(db, `corrales/${corralId}/cantidad`), nuevaCantidad);
 
@@ -188,7 +190,7 @@
           notas: notas,
           usuario: usuario,
           timestamp: Date.now()
-        }).then(() => finalizarMovimiento());
+        });
 
       } else {
         // RESTAR
@@ -198,6 +200,7 @@
           }
         }
 
+        finalizarMovimiento();
         const nuevaCantidad = Math.max(0, corralActual.cantidad - cantidad);
         set(ref(db, `corrales/${corralId}/cantidad`), nuevaCantidad);
 
@@ -211,7 +214,7 @@
           notas: notas,
           usuario: usuario,
           timestamp: Date.now()
-        }).then(() => finalizarMovimiento());
+        });
       }
     };
 
@@ -235,19 +238,20 @@
         return;
       }
 
+      toggleModal('modalFlete', false);
+
       const nuevoFleteRef = push(fletesRef);
       set(nuevoFleteRef, {
         transportista, chofer, guia, destino, cantidad, costo, estadoPago,
         timestamp: Date.now()
-      }).then(() => {
-        document.getElementById('fleteTransportista').value = '';
-        document.getElementById('fleteChofer').value = '';
-        document.getElementById('fleteGuia').value = '';
-        document.getElementById('fleteDestino').value = '';
-        document.getElementById('fleteCantidad').value = '';
-        document.getElementById('fleteCosto').value = '';
-        toggleModal('modalFlete', false);
       });
+
+      document.getElementById('fleteTransportista').value = '';
+      document.getElementById('fleteChofer').value = '';
+      document.getElementById('fleteGuia').value = '';
+      document.getElementById('fleteDestino').value = '';
+      document.getElementById('fleteCantidad').value = '';
+      document.getElementById('fleteCosto').value = '';
     };
 
     window.eliminarFlete = function(id) {
