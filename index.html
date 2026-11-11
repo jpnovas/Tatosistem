@@ -7,10 +7,10 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
 
-  <!-- Firebase App & Realtime Database SDKs -->
+  <!-- Firebase App & Realtime Database SDKs con soporte Offline -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getDatabase, ref, onValue, set, push, remove } 
+    import { getDatabase, ref, onValue, set, push, remove, goOffline, goOnline } 
       from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
     // ==========================================
@@ -37,6 +37,18 @@
     window.corralesData = {};
     window.historialData = [];
     window.fletesData = [];
+
+    // Detector de estado de red para avisar visualmente
+    window.addEventListener('online', () => {
+      document.getElementById('estadoConexion').className = "hidden";
+      goOnline(db);
+    });
+    window.addEventListener('offline', () => {
+      const banner = document.getElementById('estadoConexion');
+      banner.innerText = "Sin conexión - Trabajando localmente";
+      banner.className = "bg-amber-500 text-white text-center text-xs py-1 font-bold";
+      goOffline(db);
+    });
 
     onValue(corralesRef, (snapshot) => {
       window.corralesData = snapshot.val() || {};
@@ -112,7 +124,6 @@
         }).then(() => finalizarMovimiento());
 
       } else {
-        // RESTAR o TRASLADO
         if (cantidad > corralActual.cantidad) {
           if (!confirm(`La cantidad a restar (${cantidad}) supera las vacas en el corral (${corralActual.cantidad}). ¿Continuar de todos modos?`)) {
             return;
@@ -132,7 +143,6 @@
             const nuevaCantidadDestino = corralDestino.cantidad + cantidad;
             set(ref(db, `corrales/${corralDestinoId}/cantidad`), nuevaCantidadDestino);
 
-            // Registrar entrada en destino
             const movDestinoRef = push(historialRef);
             set(movDestinoRef, {
               corralId: corralDestinoId,
@@ -147,7 +157,6 @@
           }
         }
 
-        // Registrar salida en origen
         const nuevoMovRef = push(historialRef);
         set(nuevoMovRef, {
           corralId: corralId,
@@ -206,6 +215,9 @@
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans min-h-screen pb-20">
 
+  <!-- Aviso de Estado Offline -->
+  <div id="estadoConexion" class="hidden"></div>
+
   <!-- Encabezado Principal -->
   <header class="bg-emerald-700 text-white p-4 shadow-md sticky top-0 z-10">
     <div class="max-w-3xl mx-auto flex justify-between items-center">
@@ -213,7 +225,7 @@
         <h1 class="text-xl font-bold flex items-center gap-2">
           <i class="fa-solid font-bold fa-cow"></i> TatoCows
         </h1>
-        <p class="text-xs text-emerald-200">Administracion de ganado (Nube)</p>
+        <p class="text-xs text-emerald-200">Administracion de ganado (Nube / Offline)</p>
       </div>
       <div class="flex gap-2">
         <button onclick="toggleModal('modalFlete', true)" class="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-semibold py-2 px-3 rounded-lg flex items-center gap-1 shadow">
