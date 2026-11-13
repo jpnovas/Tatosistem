@@ -10,7 +10,7 @@
   <!-- Firebase App & Realtime Database SDKs -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getDatabase, ref, onValue, set, push, remove } 
+    import { getDatabase, ref, onValue, set, push, remove, update } 
       from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
     // ==========================================
@@ -33,10 +33,12 @@
     const corralesRef = ref(db, 'corrales');
     const historialRef = ref(db, 'historial');
     const fletesRef = ref(db, 'fletes');
+    const tareasRef = ref(db, 'tareas');
 
     window.corralesData = {};
     window.historialData = [];
     window.fletesData = [];
+    window.tareasData = {};
 
     onValue(corralesRef, (snapshot) => {
       window.corralesData = snapshot.val() || {};
@@ -57,6 +59,12 @@
       window.fletesData = Object.keys(data).map(key => ({ id: key, ...data[key] }));
       window.fletesData.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
       renderFletes();
+      renderStats();
+    });
+
+    onValue(tareasRef, (snapshot) => {
+      window.tareasData = snapshot.val() || {};
+      renderKanban();
       renderStats();
     });
 
@@ -156,7 +164,7 @@
       });
     };
 
-    // 3. ACCIÓN: TRASLADAR (DESDE - HACIA CLARO EN HISTORIAL)
+    // 3. ACCIÓN: TRASLADAR
     window.ejecutarTraslado = function() {
       const origenId = document.getElementById('trOrigenSelect').value;
       const destinoId = document.getElementById('trDestinoSelect').value;
@@ -185,14 +193,12 @@
         }
       }
 
-      // Actualizar Origen y Destino en BD
       const nuevaOrigen = Math.max(0, corralOrigen.cantidad - cantidad);
       set(ref(db, `corrales/${origenId}/cantidad`), nuevaOrigen);
 
       const nuevaDestino = corralDestino.cantidad + cantidad;
       set(ref(db, `corrales/${destinoId}/cantidad`), nuevaDestino);
 
-      // Registrar en el Historial con el formato "Desde [Origen] hacia [Destino]"
       const nuevoMovRef = push(historialRef);
       set(nuevoMovRef, {
         tipo: 'TRASLADO',
@@ -209,6 +215,7 @@
       });
     };
 
+    // GESTIÓN DE FLETES
     window.guardarFlete = function() {
       const transportista = document.getElementById('fleteTransportista').value.trim();
       const chofer = document.getElementById('fleteChofer').value.trim();
@@ -244,52 +251,81 @@
       }
     };
 
-    // FUNCIÓN DE REINICIO INTELIGENTE
-    window.resetearSistema = function() {
-      const conservarCorrales = confirm(
-        "¿Querés CONSERVAR los nombres de los corrales actuales?\n\n" +
-        "• OK / SÍ: Borra el stock a 0, limpia el historial y los fletes, pero MANTIENE los corrales creados.\n" +
-        "• CANCELAR / NO: Te preguntará si querés borrar TODO absolutamente."
-      );
+    // GESTIÓN DE KANBAN (TRABAJOS)
+    window.guardarTarea = function() {
+      const titulo = document.getElementById('tareaTituloInput').value.trim();
+      const observaciones = document.getElementById('tareaObsInput').value.trim();
+      if (!titulo) {
+        alert("Ingresá qué trabajo hay que hacer.");
+        return;
+      }
 
-      if (conservarCorrales) {
+      const nuevaTareaRef = push(tareasRef);
+      set(nuevaTareaRef, {
+        titulo,
+        observaciones,
+        estado: 'tomado', // tomado, en_ejecucion, completado
+        timestamp: Date.now()
+      }).then(() => {
+        document.getElementById('tareaTituloInput').value = '';
+        document.getElementById('tareaObsInput').value = '';
+        toggleModal('modalNuevaTarea', false);
+      });
+    };
+
+    window.cambiarEstadoTarea = function(id, nuevoEstado) {
+      update(ref(db, `tareas/${id}`), { estado: nuevoEstado });
+    };
+
+    window.eliminarTarea = function(id) {
+      if (confirm("¿Eliminar esta tarea del tablero?")) {
+        remove(ref(db, `tareas/${id}`));
+      }
+    };
+
+    // REINICIO SEGURO CON CHECKBOXES Y PALABRA "BORRAR"
+    window.ejecutarReinicioSeguro = function() {
+      const palabra = document.getElementById('inputPalabraBorrar').value.trim();
+      if (palabra !== "BORRAR") {
+        alert("Debes escribir la palabra exactas BORRAR en mayúsculas para confirmar.");
+        return;
+      }
+
+      const borrarCabezas = document.getElementById('chkCabezas').checked;
+      const borrarCorrales = document.getElementById('chkCorrales').checked;
+      const borrarFletes = document.getElementById('chkFletes').checked;
+      const borrarHistorial = document.getElementById('chkHistorial').checked;
+      const borrarTareas = document.getElementById('chkTareas').checked;
+
+      if (borrarCorrales) {
+        set(corralesRef, null);
+      } else if (borrarCabezas) {
         const corrales = window.corralesData || {};
         Object.keys(corrales).forEach(id => {
           set(ref(db, `corrales/${id}/cantidad`), 0);
         });
-        set(historialRef, null);
-        set(fletesRef, null);
-        alert("Sistema reiniciado. Los corrales se mantuvieron en 0 cabezas y se limpió el historial y fletes.");
-      } else {
-        const borrarTodo = confirm("¡ADVERTENCIA! Esto borrará ABSOLUTAMENTE TODO (corrales, historial y fletes). ¿Estás totalmente seguro?");
-        if (borrarTodo) {
-          set(corralesRef, null);
-          set(historialRef, null);
-          set(fletesRef, null);
-          alert("Base de datos completamente limpia.");
-        }
       }
+
+      if (borrarFletes) set(fletesRef, null);
+      if (borrarHistorial) set(historialRef, null);
+      if (borrarTareas) set(tareasRef, null);
+
+      alert("Reinicio aplicado correctamente.");
+      toggleModal('modalReset', false);
+      document.getElementById('inputPalabraBorrar').value = '';
     };
   </script>
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans min-h-screen pb-20">
 
-  <!-- Encabezado Principal -->
+  <!-- Encabezado Principal Limpio -->
   <header class="bg-emerald-700 text-white p-4 shadow-md sticky top-0 z-10">
     <div class="max-w-3xl mx-auto flex justify-between items-center">
       <div>
         <h1 class="text-xl font-bold flex items-center gap-2">
-          <i class="fa-solid font-bold fa-cow"></i> Control de Ganado
+          <i class="fa-solid font-bold fa-cow"></i> Control de Ganado & Campo
         </h1>
         <p class="text-xs text-emerald-200">Sincronizado en tiempo real (Nube)</p>
-      </div>
-      <div class="flex gap-2">
-        <button onclick="toggleModal('modalFlete', true)" class="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-semibold py-2 px-3 rounded-lg flex items-center gap-1 shadow">
-          <i class="fa-solid fa-truck"></i> Flete
-        </button>
-        <button onclick="toggleModal('modalNuevoCorral', true)" class="bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white text-xs font-semibold py-2 px-3 rounded-lg flex items-center gap-1 shadow">
-          <i class="fa-solid fa-plus"></i> Corral
-        </button>
       </div>
     </div>
   </header>
@@ -297,30 +333,44 @@
   <main class="max-w-3xl mx-auto p-4 space-y-6">
 
     <!-- Pestañas de Navegación Visual -->
-    <div class="flex bg-white rounded-xl shadow p-1 gap-1">
-      <button onclick="cambiarTab('corrales')" id="btnTabCorrales" class="flex-1 py-2 font-bold text-sm rounded-lg bg-emerald-600 text-white transition">Corrales & Stock</button>
-      <button onclick="cambiarTab('fletes')" id="btnTabFletes" class="flex-1 py-2 font-bold text-sm rounded-lg text-slate-600 transition">Fletes y Guías</button>
-      <button onclick="cambiarTab('historial')" id="btnTabHistorial" class="flex-1 py-2 font-bold text-sm rounded-lg text-slate-600 transition">Historial</button>
+    <div class="grid grid-cols-4 bg-white rounded-xl shadow p-1 gap-1 text-center">
+      <button onclick="cambiarTab('corrales')" id="btnTabCorrales" class="py-2 font-bold text-xs rounded-lg bg-emerald-600 text-white transition">Stock</button>
+      <button onclick="cambiarTab('fletes')" id="btnTabFletes" class="py-2 font-bold text-xs rounded-lg text-slate-600 transition">Fletes</button>
+      <button onclick="cambiarTab('tareas')" id="btnTabTareas" class="py-2 font-bold text-xs rounded-lg text-slate-600 transition">Tablero</button>
+      <button onclick="cambiarTab('historial')" id="btnTabHistorial" class="py-2 font-bold text-xs rounded-lg text-slate-600 transition">Historial</button>
     </div>
 
     <!-- TARJETAS DE RESUMEN -->
-    <section class="grid grid-cols-3 gap-3">
-      <div class="bg-white p-3 rounded-xl shadow border-l-4 border-emerald-600">
-        <p class="text-[10px] font-bold text-slate-400 uppercase">Cabezas</p>
-        <p id="statTotalVacas" class="text-2xl font-black text-slate-800">0</p>
+    <section class="grid grid-cols-4 gap-2">
+      <div class="bg-white p-2.5 rounded-xl shadow border-l-4 border-emerald-600">
+        <p class="text-[9px] font-bold text-slate-400 uppercase">Cabezas</p>
+        <p id="statTotalVacas" class="text-xl font-black text-slate-800">0</p>
       </div>
-      <div class="bg-white p-3 rounded-xl shadow border-l-4 border-blue-600">
-        <p class="text-[10px] font-bold text-slate-400 uppercase">Corrales</p>
-        <p id="statTotalCorrales" class="text-2xl font-black text-slate-800">0</p>
+      <div class="bg-white p-2.5 rounded-xl shadow border-l-4 border-blue-600">
+        <p class="text-[9px] font-bold text-slate-400 uppercase">Corrales</p>
+        <p id="statTotalCorrales" class="text-xl font-black text-slate-800">0</p>
       </div>
-      <div class="bg-white p-3 rounded-xl shadow border-l-4 border-amber-500">
-        <p class="text-[10px] font-bold text-slate-400 uppercase">Fletes</p>
-        <p id="statTotalFletes" class="text-2xl font-black text-slate-800">0</p>
+      <div class="bg-white p-2.5 rounded-xl shadow border-l-4 border-amber-500">
+        <p class="text-[9px] font-bold text-slate-400 uppercase">Fletes</p>
+        <p id="statTotalFletes" class="text-xl font-black text-slate-800">0</p>
+      </div>
+      <div class="bg-white p-2.5 rounded-xl shadow border-l-4 border-indigo-500">
+        <p class="text-[9px] font-bold text-slate-400 uppercase">Tareas</p>
+        <p id="statTotalTareas" class="text-xl font-black text-slate-800">0</p>
       </div>
     </section>
 
-    <!-- SECCIÓN 1: CORRALES (3 BOTONES PRINCIPALES) -->
+    <!-- SECCIÓN 1: CORRALES Y BOTONES DE ACCIÓN -->
     <div id="seccionCorrales" class="space-y-4">
+      <div class="flex justify-between items-center">
+        <h2 class="text-md font-bold text-slate-700 flex items-center gap-2">
+          <i class="fa-solid fa-layer-group"></i> Operaciones de Hacienda
+        </h2>
+        <button onclick="toggleModal('modalNuevoCorral', true)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-lg font-bold shadow flex items-center gap-1">
+          <i class="fa-solid fa-plus"></i> Nuevo Corral
+        </button>
+      </div>
+
       <div class="grid grid-cols-3 gap-2">
         <button onclick="abrirModal('modalIngresar')" class="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold p-3 rounded-xl shadow flex flex-col items-center justify-center gap-1">
           <i class="fa-solid fa-circle-plus text-xl"></i>
@@ -336,10 +386,8 @@
         </button>
       </div>
 
-      <section>
-        <h2 class="text-md font-bold text-slate-700 mb-3 flex items-center gap-2">
-          <i class="fa-solid fa-layer-group"></i> Estado Actual de Corrales
-        </h2>
+      <section class="mt-4">
+        <h3 class="text-sm font-bold text-slate-600 mb-2">Estado Actual de Corrales</h3>
         <div id="listaCorrales" class="space-y-3"></div>
       </section>
     </div>
@@ -350,19 +398,66 @@
         <h2 class="text-md font-bold text-slate-700 flex items-center gap-2">
           <i class="fa-solid fa-truck-moving"></i> Registro de Transportes y DTE
         </h2>
-        <button onclick="toggleModal('modalFlete', true)" class="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold">+ Nuevo Flete</button>
+        <button onclick="toggleModal('modalFlete', true)" class="bg-blue-600 text-white text-xs px-3 py-2 rounded-lg font-bold shadow">
+          + Nuevo Flete
+        </button>
       </div>
       <div id="listaFletes" class="space-y-3"></div>
     </div>
 
-    <!-- SECCIÓN 3: HISTORIAL Y RESET -->
+    <!-- SECCIÓN 3: TABLERO KANBAN DE TRABAJOS -->
+    <div id="seccionTareas" class="space-y-4 hidden">
+      <div class="flex justify-between items-center">
+        <div>
+          <h2 class="text-md font-bold text-slate-700 flex items-center gap-2">
+            <i class="fa-solid fa-clipboard-list"></i> Tablero de Labores del Campo
+          </h2>
+          <p class="text-xs text-slate-400">Organización rápida de tareas pendientes</p>
+        </div>
+        <button onclick="toggleModal('modalNuevaTarea', true)" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2 rounded-lg font-bold shadow flex items-center gap-1">
+          <i class="fa-solid fa-plus"></i> Nueva Tarea
+        </button>
+      </div>
+
+      <!-- Columnas Kanban -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <!-- Columna 1: Tomado -->
+        <div class="bg-slate-200/70 p-3 rounded-xl space-y-2">
+          <div class="flex justify-between items-center font-bold text-xs text-slate-700 uppercase tracking-wider">
+            <span><i class="fa-regular fa-circle text-slate-500 mr-1"></i> Tomadas</span>
+            <span id="countTomado" class="bg-slate-300 text-slate-700 px-2 py-0.5 rounded-full text-[10px]">0</span>
+          </div>
+          <div id="colTomado" class="space-y-2 min-h-[150px]"></div>
+        </div>
+
+        <!-- Columna 2: En Ejecución -->
+        <div class="bg-amber-50 p-3 rounded-xl space-y-2 border border-amber-200">
+          <div class="flex justify-between items-center font-bold text-xs text-amber-800 uppercase tracking-wider">
+            <span><i class="fa-solid fa-spinner text-amber-600 mr-1"></i> En Ejecución</span>
+            <span id="countEjecucion" class="bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full text-[10px]">0</span>
+          </div>
+          <div id="colEjecucion" class="space-y-2 min-h-[150px]"></div>
+        </div>
+
+        <!-- Columna 3: Completado -->
+        <div class="bg-emerald-50 p-3 rounded-xl space-y-2 border border-emerald-200">
+          <div class="flex justify-between items-center font-bold text-xs text-emerald-800 uppercase tracking-wider">
+            <span><i class="fa-solid fa-check-circle text-emerald-600 mr-1"></i> Completadas</span>
+            <span id="countCompletado" class="bg-emerald-200 text-emerald-800 px-2 py-0.5 rounded-full text-[10px]">0</span>
+          </div>
+          <div id="colCompletado" class="space-y-2 min-h-[150px]"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECCIÓN 4: HISTORIAL Y RESET SEGURO -->
     <div id="seccionHistorial" class="space-y-4 hidden">
       <div class="flex justify-between items-center">
         <h2 class="text-md font-bold text-slate-700 flex items-center gap-2">
           <i class="fa-solid fa-clock-rotate-left"></i> Historial de Movimientos
         </h2>
-        <button onclick="resetearSistema()" class="bg-slate-200 hover:bg-rose-100 hover:text-rose-700 text-slate-600 text-xs px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1">
-          <i class="fa-solid fa-rotate-right"></i> Reiniciar Base
+        <button onclick="toggleModal('modalReset', true)" class="bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1 shadow-sm">
+          <i class="fa-solid fa-triangle-exclamation"></i> Reiniciar Base
         </button>
       </div>
       <div id="listaHistorial" class="bg-white rounded-xl shadow divide-y divide-slate-100 max-h-96 overflow-y-auto"></div>
@@ -534,25 +629,92 @@
     </div>
   </div>
 
+  <!-- MODAL NUEVA TAREA (KANBAN) -->
+  <div id="modalNuevaTarea" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-3">
+      <h3 class="text-lg font-bold text-indigo-700"><i class="fa-solid fa-clipboard-list"></i> Nueva Tarea de Campo</h3>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">¿Qué hay que hacer?</label>
+        <input type="text" id="tareaTituloInput" placeholder="Ej: Arreglar alambre potrero 3" class="w-full border rounded-lg p-3 text-sm outline-none">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Observaciones / Detalles</label>
+        <input type="text" id="tareaObsInput" placeholder="Ej: Llevar grampas y pinza" class="w-full border rounded-lg p-3 text-sm outline-none">
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button onclick="toggleModal('modalNuevaTarea', false)" class="px-4 py-2 text-slate-600 font-semibold text-sm">Cancelar</button>
+        <button onclick="guardarTarea()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg font-bold text-sm">Guardar Tarea</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL REINICIO SEGURO (CHECKBOXES + BORRAR) -->
+  <div id="modalReset" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4">
+      <h3 class="text-lg font-bold text-rose-700 flex items-center gap-2">
+        <i class="fa-solid fa-triangle-exclamation"></i> Reinicio o Limpieza de Base
+      </h3>
+      <p class="text-xs text-slate-500">Seleccioná qué elementos deseás borrar o restablecer:</p>
+      
+      <div class="space-y-2 bg-slate-50 p-3 rounded-xl text-sm">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="chkCabezas" class="w-4 h-4 text-rose-600 rounded">
+          <span>Poner cantidad de cabezas en 0 (manteniendo corrales)</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="chkCorrales" class="w-4 h-4 text-rose-600 rounded">
+          <span>Borrar TODOS los corrales creados</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="chkFletes" class="w-4 h-4 text-rose-600 rounded">
+          <span>Borrar registros de Fletes</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="chkHistorial" class="w-4 h-4 text-rose-600 rounded">
+          <span>Borrar Historial de Movimientos</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="chkTareas" class="w-4 h-4 text-rose-600 rounded">
+          <span>Borrar Tablero de Tareas</span>
+        </label>
+      </div>
+
+      <div class="space-y-1">
+        <label class="block text-xs font-bold text-slate-700">Para confirmar, escribí la palabra <span class="text-rose-600 font-extrabold">BORRAR</span>:</label>
+        <input type="text" id="inputPalabraBorrar" placeholder="Escribí BORRAR aquí" class="w-full border rounded-lg p-2.5 text-sm uppercase outline-none focus:ring-2 focus:ring-rose-500">
+      </div>
+
+      <div class="flex justify-end gap-3 pt-2">
+        <button onclick="toggleModal('modalReset', false)" class="px-4 py-2 text-slate-600 font-semibold text-sm">Cancelar</button>
+        <button onclick="ejecutarReinicioSeguro()" class="bg-rose-600 hover:bg-rose-700 text-white px-5 py-2 rounded-lg font-bold text-sm shadow">Ejecutar Limpieza</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     window.cambiarTab = function(tab) {
       document.getElementById('seccionCorrales').classList.add('hidden');
       document.getElementById('seccionFletes').classList.add('hidden');
+      document.getElementById('seccionTareas').classList.add('hidden');
       document.getElementById('seccionHistorial').classList.add('hidden');
 
-      document.getElementById('btnTabCorrales').className = "flex-1 py-2 font-bold text-sm rounded-lg text-slate-600 transition";
-      document.getElementById('btnTabFletes').className = "flex-1 py-2 font-bold text-sm rounded-lg text-slate-600 transition";
-      document.getElementById('btnTabHistorial').className = "flex-1 py-2 font-bold text-sm rounded-lg text-slate-600 transition";
+      document.getElementById('btnTabCorrales').className = "py-2 font-bold text-xs rounded-lg text-slate-600 transition";
+      document.getElementById('btnTabFletes').className = "py-2 font-bold text-xs rounded-lg text-slate-600 transition";
+      document.getElementById('btnTabTareas').className = "py-2 font-bold text-xs rounded-lg text-slate-600 transition";
+      document.getElementById('btnTabHistorial').className = "py-2 font-bold text-xs rounded-lg text-slate-600 transition";
 
       if (tab === 'corrales') {
         document.getElementById('seccionCorrales').classList.remove('hidden');
-        document.getElementById('btnTabCorrales').className = "flex-1 py-2 font-bold text-sm rounded-lg bg-emerald-600 text-white transition";
+        document.getElementById('btnTabCorrales').className = "py-2 font-bold text-xs rounded-lg bg-emerald-600 text-white transition";
       } else if (tab === 'fletes') {
         document.getElementById('seccionFletes').classList.remove('hidden');
-        document.getElementById('btnTabFletes').className = "flex-1 py-2 font-bold text-sm rounded-lg bg-blue-600 text-white transition";
+        document.getElementById('btnTabFletes').className = "py-2 font-bold text-xs rounded-lg bg-blue-600 text-white transition";
+      } else if (tab === 'tareas') {
+        document.getElementById('seccionTareas').classList.remove('hidden');
+        document.getElementById('btnTabTareas').className = "py-2 font-bold text-xs rounded-lg bg-indigo-600 text-white transition";
       } else if (tab === 'historial') {
         document.getElementById('seccionHistorial').classList.remove('hidden');
-        document.getElementById('btnTabHistorial').className = "flex-1 py-2 font-bold text-sm rounded-lg bg-slate-700 text-white transition";
+        document.getElementById('btnTabHistorial').className = "py-2 font-bold text-xs rounded-lg bg-slate-700 text-white transition";
       }
     };
 
@@ -569,7 +731,7 @@
     window.abrirModal = function(id) {
       const ids = Object.keys(window.corralesData || {});
       if (ids.length === 0) {
-        alert("Primero debés crear al menos un corral con el botón '+ Corral'.");
+        alert("Primero debés crear al menos un corral con el botón '+ Nuevo Corral'.");
         return;
       }
       toggleModal(id, true);
@@ -578,6 +740,7 @@
     function renderStats() {
       const corrales = window.corralesData || {};
       const fletes = window.fletesData || [];
+      const tareas = window.tareasData || {};
       const keys = Object.keys(corrales);
       let totalVacas = 0;
       keys.forEach(k => { totalVacas += (corrales[k].cantidad || 0); });
@@ -585,6 +748,7 @@
       document.getElementById('statTotalVacas').innerText = totalVacas;
       document.getElementById('statTotalCorrales').innerText = keys.length;
       document.getElementById('statTotalFletes').innerText = fletes.length;
+      document.getElementById('statTotalTareas').innerText = Object.keys(tareas).length;
     }
 
     function renderCorrales() {
@@ -593,7 +757,7 @@
       const keys = Object.keys(corrales);
 
       if (keys.length === 0) {
-        container.innerHTML = `<div class="bg-white p-6 rounded-xl text-center text-slate-400 text-sm">No hay corrales registrados. Creá el primero arriba con "+ Corral".</div>`;
+        container.innerHTML = `<div class="bg-white p-6 rounded-xl text-center text-slate-400 text-sm">No hay corrales registrados. Creá el primero arriba.</div>`;
         return;
       }
 
@@ -630,6 +794,59 @@
       if (selEg) selEg.innerHTML = opciones;
       if (selTrOrig) selTrOrig.innerHTML = opciones;
       if (selTrDest) selTrDest.innerHTML = opciones;
+    }
+
+    function renderKanban() {
+      const tareas = window.tareasData || {};
+      const colTomado = document.getElementById('colTomado');
+      const colEjecucion = document.getElementById('colEjecucion');
+      const colCompletado = document.getElementById('colCompletado');
+
+      let htmlTomado = '';
+      let htmlEjecucion = '';
+      let htmlCompletado = '';
+
+      let cTomado = 0, cEjecucion = 0, cCompletado = 0;
+
+      Object.keys(tareas).forEach(id => {
+        const t = tareas[id];
+        const cardHTML = `
+          <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 space-y-2 text-xs">
+            <div class="flex justify-between items-start gap-2">
+              <span class="font-bold text-slate-800 text-sm">${t.titulo}</span>
+              <button onclick="eliminarTarea('${id}')" class="text-slate-300 hover:text-rose-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            ${t.observaciones ? `<p class="text-slate-500 bg-slate-50 p-1.5 rounded">${t.observaciones}</p>` : ''}
+            <div class="flex justify-between items-center pt-1 border-t border-slate-100">
+              <div class="flex gap-1">
+                ${t.estado !== 'tomado' ? `<button onclick="cambiarEstadoTarea('${id}', '${t.estado === 'completado' ? 'en_ejecucion' : 'tomado'}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-600"><i class="fa-solid fa-chevron-left"></i></button>` : ''}
+              </div>
+              <div class="flex gap-1">
+                ${t.estado !== 'completado' ? `<button onclick="cambiarEstadoTarea('${id}', '${t.estado === 'tomado' ? 'en_ejecucion' : 'completado'}')" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded">Avanzar <i class="fa-solid fa-chevron-right ml-1"></i></button>` : '<span class="text-emerald-600 font-bold">¡Listo!</span>'}
+              </div>
+            </div>
+          </div>
+        `;
+
+        if (t.estado === 'tomado') {
+          htmlTomado += cardHTML;
+          cTomado++;
+        } else if (t.estado === 'en_ejecucion') {
+          htmlEjecucion += cardHTML;
+          cEjecucion++;
+        } else if (t.estado === 'completado') {
+          htmlCompletado += cardHTML;
+          cCompletado++;
+        }
+      });
+
+      colTomado.innerHTML = htmlTomado || '<p class="text-xs text-slate-400 text-center py-4">Sin tareas</p>';
+      colEjecucion.innerHTML = htmlEjecucion || '<p class="text-xs text-slate-400 text-center py-4">Sin tareas</p>';
+      colCompletado.innerHTML = htmlCompletado || '<p class="text-xs text-slate-400 text-center py-4">Sin tareas</p>';
+
+      document.getElementById('countTomado').innerText = cTomado;
+      document.getElementById('countEjecucion').innerText = cEjecucion;
+      document.getElementById('countCompletado').innerText = cCompletado;
     }
 
     function renderHistorial() {
