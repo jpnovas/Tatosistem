@@ -74,7 +74,28 @@
 
     window.eliminarCorral = function(id, nombre) {
       if (confirm(`¿Estás seguro de eliminar el corral "${nombre}"?`)) {
-        remove(ref(db, `corrales/${id}`)); } };  // 1. ACCIÓN: INGRESAR (SUMAR) window.ejecutarIngreso = function() { const corralId = document.getElementById('ingCorralSelect').value; const cantidad = parseInt(document.getElementById('ingCantidadInput').value, 10); const motivo = document.getElementById('ingMotivoSelect').value; const usuario = document.getElementById('ingUsuarioInput').value.trim() \vert{}\vert{} 'Operador'; const notas = document.getElementById('ingNotasInput').value.trim();  if (!corralId \vert{}\vert{} isNaN(cantidad) \vert{}\vert{} cantidad <= 0) { alert("Ingresá una cantidad válida mayor a 0"); return; }  const corral = window.corralesData[corralId]; if (!corral) return;  const nuevaCantidad = corral.cantidad + cantidad; set(ref(db, `corrales/${corralId}/cantidad`), nuevaCantidad);
+        remove(ref(db, `corrales/${id}`));
+      }
+    };
+
+    // 1. ACCIÓN: INGRESAR (SUMAR)
+    window.ejecutarIngreso = function() {
+      const corralId = document.getElementById('ingCorralSelect').value;
+      const cantidad = parseInt(document.getElementById('ingCantidadInput').value, 10);
+      const motivo = document.getElementById('ingMotivoSelect').value;
+      const usuario = document.getElementById('ingUsuarioInput').value.trim() || 'Operador';
+      const notas = document.getElementById('ingNotasInput').value.trim();
+
+      if (!corralId || isNaN(cantidad) || cantidad <= 0) {
+        alert("Ingresá una cantidad válida mayor a 0");
+        return;
+      }
+
+      const corral = window.corralesData[corralId];
+      if (!corral) return;
+
+      const nuevaCantidad = corral.cantidad + cantidad;
+      set(ref(db, `corrales/${corralId}/cantidad`), nuevaCantidad);
 
       const nuevoMovRef = push(historialRef);
       set(nuevoMovRef, {
@@ -159,14 +180,17 @@
       if (!corralOrigen || !corralDestino) return;
 
       if (cantidad > corralOrigen.cantidad) {
-        if (!confirm(`Vas a sacar ${cantidad} cabezas, pero el corral origen tiene${corralOrigen.cantidad}. ¿Continuar?`)) {
+        if (!confirm(`Vas a sacar ${cantidad} cabezas, pero el corral origen tiene ${corralOrigen.cantidad}. ¿Continuar?`)) {
           return;
         }
       }
 
       // Actualizar Origen y Destino en BD
       const nuevaOrigen = Math.max(0, corralOrigen.cantidad - cantidad);
-      set(ref(db, `corrales/${origenId}/cantidad`), nuevaOrigen);  const nuevaDestino = corralDestino.cantidad + cantidad; set(ref(db, `corrales/${destinoId}/cantidad`), nuevaDestino);
+      set(ref(db, `corrales/${origenId}/cantidad`), nuevaOrigen);
+
+      const nuevaDestino = corralDestino.cantidad + cantidad;
+      set(ref(db, `corrales/${destinoId}/cantidad`), nuevaDestino);
 
       // Registrar en el Historial con el formato "Desde [Origen] hacia [Destino]"
       const nuevoMovRef = push(historialRef);
@@ -174,7 +198,7 @@
         tipo: 'TRASLADO',
         cantidad: cantidad,
         motivo: 'Traslado entre corrales',
-        nombreCorral: `Desde ${corralOrigen.nombre} hacia${corralDestino.nombre}`,
+        nombreCorral: `Desde ${corralOrigen.nombre} hacia ${corralDestino.nombre}`,
         notas: notas,
         usuario: usuario,
         timestamp: Date.now()
@@ -216,9 +240,23 @@
 
     window.eliminarFlete = function(id) {
       if (confirm("¿Eliminar este registro de flete?")) {
-        remove(ref(db, `fletes/${id}`)); } };  // FUNCIÓN DE REINICIO INTELIGENTE window.resetearSistema = function() { const conservarCorrales = confirm( "¿Querés CONSERVAR los nombres de los corrales actuales?\n\n" + "• OK / SÍ: Borra el stock a 0, limpia el historial y los fletes, pero MANTIENE los corrales creados.\n" + "• CANCELAR / NO: Te preguntará si querés borrar TODO absolutamente." );  if (conservarCorrales) { // Poner corrales a 0 pero mantenerlos const corrales = window.corralesData \vert{}\vert{} {}; Object.keys(corrales).forEach(id => { set(ref(db, `corrales/${id}/cantidad`), 0);
+        remove(ref(db, `fletes/${id}`));
+      }
+    };
+
+    // FUNCIÓN DE REINICIO INTELIGENTE
+    window.resetearSistema = function() {
+      const conservarCorrales = confirm(
+        "¿Querés CONSERVAR los nombres de los corrales actuales?\n\n" +
+        "• OK / SÍ: Borra el stock a 0, limpia el historial y los fletes, pero MANTIENE los corrales creados.\n" +
+        "• CANCELAR / NO: Te preguntará si querés borrar TODO absolutamente."
+      );
+
+      if (conservarCorrales) {
+        const corrales = window.corralesData || {};
+        Object.keys(corrales).forEach(id => {
+          set(ref(db, `corrales/${id}/cantidad`), 0);
         });
-        // Borrar historial y fletes
         set(historialRef, null);
         set(fletesRef, null);
         alert("Sistema reiniciado. Los corrales se mantuvieron en 0 cabezas y se limpió el historial y fletes.");
@@ -518,7 +556,7 @@
       }
     };
 
-    function toggleModal(id, show) {
+    window.toggleModal = function(id, show) {
       const modal = document.getElementById(id);
       if (show) {
         populateSelects();
@@ -526,7 +564,7 @@
       } else {
         modal.classList.add('hidden');
       }
-    }
+    };
 
     window.abrirModal = function(id) {
       const ids = Object.keys(window.corralesData || {});
@@ -653,7 +691,7 @@
             <div class="flex justify-between items-start">
               <div>
                 <h3 class="font-bold text-base text-slate-800"><i class="fa-solid fa-truck text-blue-600 mr-1"></i> ${f.transportista}</h3>
-                <p class="text-xs text-slate-500">Fecha: ${fecha}${f.chofer ? '&bull; Chofer: ' + f.chofer : ''}</p>
+                <p class="text-xs text-slate-500">Fecha: ${fecha} ${f.chofer ? '&bull; Chofer: ' + f.chofer : ''}</p>
               </div>
               <button onclick="eliminarFlete('${f.id}')" class="text-slate-300 hover:text-rose-500 p-1">
                 <i class="fa-solid fa-trash"></i>
@@ -662,4 +700,16 @@
             <div class="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-lg text-xs">
               <div><span class="text-slate-400">Guía DTE:</span> <strong class="text-slate-700">${f.guia || 'N/D'}</strong></div>
               <div><span class="text-slate-400">Cantidad:</span> <strong class="text-emerald-700">${f.cantidad} cabezas</strong></div>
-              <div><span class="text-slate-400">Destino:</span> <strong class="text-slate-7
+              <div><span class="text-slate-400">Destino:</span> <strong class="text-slate-700">${f.destino || 'N/D'}</strong></div>
+              <div><span class="text-slate-400">Costo:</span> <strong class="text-slate-700">$${f.costo.toLocaleString()}</strong></div>
+            </div>
+            <div class="flex justify-end pt-1">
+              <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full ${pagoClase}">Pago: ${f.estadoPago}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  </script>
+</body>
+</html>
