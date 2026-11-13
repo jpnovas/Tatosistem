@@ -158,8 +158,6 @@
         usuario: usuario,
         timestamp: Date.now()
       }).then(() => {
-        document.getElementById('ingCantidadInput').value = '';
-        document.getElementById('ingNotasInput').value = '';
         toggleModal('modalIngresar', false);
       });
     };
@@ -200,8 +198,6 @@
         usuario: usuario,
         timestamp: Date.now()
       }).then(() => {
-        document.getElementById('egCantidadInput').value = '';
-        document.getElementById('egNotasInput').value = '';
         toggleModal('modalEgresar', false);
       });
     };
@@ -251,8 +247,6 @@
         usuario: usuario,
         timestamp: Date.now()
       }).then(() => {
-        document.getElementById('trCantidadInput').value = '';
-        document.getElementById('trNotasInput').value = '';
         toggleModal('modalTraslado', false);
       });
     };
@@ -898,6 +892,13 @@
       if (show) {
         if (id === 'modalIngresar' || id === 'modalEgresar' || id === 'modalTraslado') {
           populateSelects();
+          // Limpiar campos para que arranquen limpios
+          const cantInput = document.getElementById(id.replace('modal', '').toLowerCase() + 'CantidadInput');
+          const notasInput = document.getElementById(id.replace('modal', '').toLowerCase() + 'NotasInput');
+          const usuarioInput = document.getElementById(id.replace('modal', '').toLowerCase() + 'UsuarioInput');
+          if (cantInput) cantInput.value = '';
+          if (notasInput) notasInput.value = '';
+          if (usuarioInput) usuarioInput.value = '';
         }
         modal.classList.remove('hidden');
       } else {
@@ -945,18 +946,15 @@
 
       container.innerHTML = keys.map(id => {
         const c = corrales[id];
-        const obsBadge = c.observacion 
-          ? `<span class="inline-block bg-amber-100 text-amber-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-amber-200">${c.observacion}</span>` 
-          : `<span class="text-xs text-slate-400 italic">Sin observación</span>`;
+        const obsDisplay = c.observacion 
+          ? `<span class="inline-block bg-amber-100 text-amber-800 text-xs font-medium px-2 py-0.5 rounded border border-amber-200 mt-1 max-w-full truncate">${c.observacion}</span>` 
+          : `<span class="text-xs text-slate-400 italic mt-0.5">Sin observación</span>`;
 
         return `
-          <div class="bg-white p-3.5 rounded-xl shadow flex items-center justify-between gap-2">
+          <div class="bg-white p-4 rounded-xl shadow flex items-center justify-between gap-3">
             <div class="min-w-0 flex-1">
-              <h3 class="font-bold text-base text-slate-800 truncate">${c.nombre}</h3>
-            </div>
-            
-            <div class="flex-shrink-0 text-center px-1">
-              ${obsBadge}
+              <h3 class="font-black text-base text-slate-800 leading-snug break-words">${c.nombre}</h3>
+              <div>${obsDisplay}</div>
             </div>
 
             <div class="flex items-center gap-2 flex-shrink-0">
