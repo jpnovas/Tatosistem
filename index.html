@@ -75,20 +75,55 @@
       renderNotas();
     });
 
+    // CREAR Y EDITAR CORRALES / LOTES
     window.crearCorral = function() {
-      const input = document.getElementById('nombreCorralInput');
-      const nombre = input.value.trim();
+      const inputNombre = document.getElementById('nombreCorralInput');
+      const inputObs = document.getElementById('obsCorralInput');
+      const nombre = inputNombre.value.trim();
+      const observacion = inputObs.value.trim();
       if (!nombre) return;
 
       const newCorralRef = push(corralesRef);
-      set(newCorralRef, { nombre: nombre, cantidad: 0 }).then(() => {
-        input.value = '';
+      set(newCorralRef, { 
+        nombre: nombre, 
+        observacion: observacion,
+        cantidad: 0 
+      }).then(() => {
+        inputNombre.value = '';
+        inputObs.value = '';
         toggleModal('modalNuevoCorral', false);
       });
     };
 
+    window.abrirEditarCorral = function(id) {
+      const corral = window.corralesData[id];
+      if (!corral) return;
+      document.getElementById('editCorralIdInput').value = id;
+      document.getElementById('editNombreCorralInput').value = corral.nombre || '';
+      document.getElementById('editObsCorralInput').value = corral.observacion || '';
+      toggleModal('modalEditarCorral', true);
+    };
+
+    window.guardarEdicionCorral = function() {
+      const id = document.getElementById('editCorralIdInput').value;
+      const nombre = document.getElementById('editNombreCorralInput').value.trim();
+      const observacion = document.getElementById('editObsCorralInput').value.trim();
+
+      if (!id || !nombre) {
+        alert("El nombre del lote o corral no puede estar vacío.");
+        return;
+      }
+
+      update(ref(db, `corrales/${id}`), {
+        nombre: nombre,
+        observacion: observacion
+      }).then(() => {
+        toggleModal('modalEditarCorral', false);
+      });
+    };
+
     window.eliminarCorral = function(id, nombre) {
-      if (confirm(`¿Estás seguro de eliminar el corral "${nombre}"?`)) {
+      if (confirm(`¿Estás seguro de eliminar el lote/corral "${nombre}"?`)) {
         remove(ref(db, `corrales/${id}`));
       }
     };
@@ -109,7 +144,7 @@
       const corral = window.corralesData[corralId];
       if (!corral) return;
 
-      const nuevaCantidad = corral.cantidad + cantidad;
+      const nuevaCantidad = (corral.cantidad || 0) + cantidad;
       set(ref(db, `corrales/${corralId}/cantidad`), nuevaCantidad);
 
       const nuevoMovRef = push(historialRef);
@@ -145,13 +180,13 @@
       const corral = window.corralesData[corralId];
       if (!corral) return;
 
-      if (cantidad > corral.cantidad) {
-        if (!confirm(`La cantidad a restar (${cantidad}) supera las vacas en el corral (${corral.cantidad}). ¿Continuar de todos modos?`)) {
+      if (cantidad > (corral.cantidad || 0)) {
+        if (!confirm(`La cantidad a restar (${cantidad}) supera los animales en el lote (${corral.cantidad || 0}). ¿Continuar de todos modos?`)) {
           return;
         }
       }
 
-      const nuevaCantidad = Math.max(0, corral.cantidad - cantidad);
+      const nuevaCantidad = Math.max(0, (corral.cantidad || 0) - cantidad);
       set(ref(db, `corrales/${corralId}/cantidad`), nuevaCantidad);
 
       const nuevoMovRef = push(historialRef);
@@ -185,7 +220,7 @@
       }
 
       if (origenId === destinoId) {
-        alert("El corral de origen y destino no pueden ser el mismo.");
+        alert("El lote de origen y destino no pueden ser el mismo.");
         return;
       }
 
@@ -194,23 +229,23 @@
 
       if (!corralOrigen || !corralDestino) return;
 
-      if (cantidad > corralOrigen.cantidad) {
-        if (!confirm(`Vas a sacar ${cantidad} cabezas, pero el corral origen tiene ${corralOrigen.cantidad}. ¿Continuar?`)) {
+      if (cantidad > (corralOrigen.cantidad || 0)) {
+        if (!confirm(`Vas a sacar ${cantidad} cabezas, pero el lote origen tiene ${corralOrigen.cantidad || 0}. ¿Continuar?`)) {
           return;
         }
       }
 
-      const nuevaOrigen = Math.max(0, corralOrigen.cantidad - cantidad);
+      const nuevaOrigen = Math.max(0, (corralOrigen.cantidad || 0) - cantidad);
       set(ref(db, `corrales/${origenId}/cantidad`), nuevaOrigen);
 
-      const nuevaDestino = corralDestino.cantidad + cantidad;
+      const nuevaDestino = (corralDestino.cantidad || 0) + cantidad;
       set(ref(db, `corrales/${destinoId}/cantidad`), nuevaDestino);
 
       const nuevoMovRef = push(historialRef);
       set(nuevoMovRef, {
         tipo: 'TRASLADO',
         cantidad: cantidad,
-        motivo: 'Traslado entre corrales',
+        motivo: 'Traslado entre lotes',
         nombreCorral: `Desde ${corralOrigen.nombre} hacia ${corralDestino.nombre}`,
         notas: notas,
         usuario: usuario,
@@ -263,7 +298,7 @@
       }
     };
 
-    // GESTIÓN DE KANBAN (CON EDICIÓN DE OBSERVACIONES)
+    // GESTIÓN DE KANBAN Y ARCHIVO DE TAREAS
     window.guardarTarea = function() {
       const titulo = document.getElementById('tareaTituloInput').value.trim();
       const observaciones = document.getElementById('tareaObsInput').value.trim();
@@ -277,6 +312,7 @@
         titulo,
         observaciones,
         estado: 'tomado',
+        archivada: false,
         timestamp: Date.now()
       }).then(() => {
         document.getElementById('tareaTituloInput').value = '';
@@ -289,34 +325,41 @@
       update(ref(db, `tareas/${id}`), { estado: nuevoEstado });
     };
 
-    window.editarObsTarea = function(id, obsActual) {
-      const nuevaObs = prompt("Actualizar observaciones o detalles:", obsActual || "");
+    window.editarObsTarea = function(id) {
+      const t = window.tareasData[id];
+      const nuevaObs = prompt("Actualizar observaciones o detalles:", (t && t.observaciones) ? t.observaciones : "");
       if (nuevaObs !== null) {
         update(ref(db, `tareas/${id}`), { observaciones: nuevaObs.trim() });
       }
     };
 
     window.eliminarTarea = function(id) {
-      if (confirm("¿Eliminar esta tarea del tablero?")) {
+      if (confirm("¿Eliminar definitivamente esta tarea?")) {
         remove(ref(db, `tareas/${id}`));
       }
     };
 
-    // ARCHIVAR TAREAS COMPLETADAS
     window.archivarCompletadas = function() {
       const tareas = window.tareasData || {};
       let archivadas = 0;
       Object.keys(tareas).forEach(id => {
-        if (tareas[id].estado === 'completado') {
-          remove(ref(db, `tareas/${id}`));
+        if (tareas[id].estado === 'completado' && !tareas[id].archivada) {
+          update(ref(db, `tareas/${id}`), { 
+            archivada: true,
+            fechaArchivado: Date.now()
+          });
           archivadas++;
         }
       });
       if (archivadas > 0) {
-        alert(`Se archivaron y limpiaron ${archivadas} tareas completadas del tablero.`);
+        alert(`Se archivaron ${archivadas} tareas completadas. Podés consultarlas en el botón "Ver Archivadas".`);
       } else {
-        alert("No hay tareas completadas para archivar.");
+        alert("No hay tareas completadas nuevas para archivar.");
       }
+    };
+
+    window.restaurarTarea = function(id) {
+      update(ref(db, `tareas/${id}`), { archivada: false });
     };
 
     // NOTAS RÁPIDAS
@@ -374,7 +417,7 @@
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans min-h-screen pb-20">
 
-  <!-- Encabezado Principal Actualizado -->
+  <!-- Encabezado Principal -->
   <header class="bg-emerald-700 text-white p-4 shadow-md sticky top-0 z-10">
     <div class="max-w-3xl mx-auto flex justify-between items-center">
       <div>
@@ -390,7 +433,7 @@
 
     <!-- Pestañas de Navegación Visual -->
     <div class="grid grid-cols-4 bg-white rounded-xl shadow p-1 gap-1 text-center">
-      <button onclick="cambiarTab('corrales')" id="btnTabCorrales" class="py-2 font-bold text-xs rounded-lg bg-emerald-600 text-white transition">Stock</button>
+      <button onclick="cambiarTab('corrales')" id="btnTabCorrales" class="py-2 font-bold text-xs rounded-lg bg-emerald-600 text-white transition">Lotes / Stock</button>
       <button onclick="cambiarTab('fletes')" id="btnTabFletes" class="py-2 font-bold text-xs rounded-lg text-slate-600 transition">Fletes</button>
       <button onclick="cambiarTab('tareas')" id="btnTabTareas" class="py-2 font-bold text-xs rounded-lg text-slate-600 transition">Tablero</button>
       <button onclick="cambiarTab('historial')" id="btnTabHistorial" class="py-2 font-bold text-xs rounded-lg text-slate-600 transition">Historial</button>
@@ -403,7 +446,7 @@
         <p id="statTotalVacas" class="text-xl font-black text-slate-800">0</p>
       </div>
       <div class="bg-white p-2.5 rounded-xl shadow border-l-4 border-blue-600">
-        <p class="text-[9px] font-bold text-slate-400 uppercase">Corrales</p>
+        <p class="text-[9px] font-bold text-slate-400 uppercase">Lotes</p>
         <p id="statTotalCorrales" class="text-xl font-black text-slate-800">0</p>
       </div>
       <div class="bg-white p-2.5 rounded-xl shadow border-l-4 border-amber-500">
@@ -416,14 +459,14 @@
       </div>
     </section>
 
-    <!-- SECCIÓN 1: CORRALES Y ACCIONES -->
+    <!-- SECCIÓN 1: LOTES / CORRALES Y ACCIONES -->
     <div id="seccionCorrales" class="space-y-4">
       <div class="flex justify-between items-center">
         <h2 class="text-md font-bold text-slate-700 flex items-center gap-2">
-          <i class="fa-solid fa-layer-group"></i> Operaciones de Hacienda
+          <i class="fa-solid fa-layer-group"></i> Operaciones de Hacienda y Lotes
         </h2>
         <button onclick="toggleModal('modalNuevoCorral', true)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-lg font-bold shadow flex items-center gap-1">
-          <i class="fa-solid fa-plus"></i> Nuevo Corral
+          <i class="fa-solid fa-plus"></i> Nuevo Lote
         </button>
       </div>
 
@@ -443,7 +486,10 @@
       </div>
 
       <section class="mt-4">
-        <h3 class="text-sm font-bold text-slate-600 mb-2">Estado Actual de Corrales</h3>
+        <div class="flex justify-between items-center mb-2">
+          <h3 class="text-sm font-bold text-slate-600">Estado Actual de Lotes / Corrales</h3>
+          <span class="text-[11px] text-slate-400">Tocá el lápiz para editar</span>
+        </div>
         <div id="listaCorrales" class="space-y-3"></div>
       </section>
     </div>
@@ -468,19 +514,22 @@
 
     <!-- SECCIÓN 3: TABLERO KANBAN Y NOTAS RÁPIDAS -->
     <div id="seccionTareas" class="space-y-4 hidden">
-      <div class="flex justify-between items-center">
+      <div class="flex flex-wrap justify-between items-center gap-2">
         <div>
           <h2 class="text-md font-bold text-slate-700 flex items-center gap-2">
             <i class="fa-solid fa-clipboard-list"></i> Tablero de Labores
           </h2>
           <p class="text-xs text-slate-400">Tocá una tarea para editar sus detalles</p>
         </div>
-        <div class="flex gap-2">
+        <div class="flex gap-1.5">
+          <button onclick="toggleModal('modalArchivadas', true)" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-2.5 py-2 rounded-lg font-bold shadow flex items-center gap-1">
+            <i class="fa-solid fa-folder-open"></i> Archivadas (<span id="countArchivadasBtn">0</span>)
+          </button>
           <button onclick="archivarCompletadas()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-2.5 py-2 rounded-lg font-bold shadow flex items-center gap-1" title="Archivar tareas completadas">
             <i class="fa-solid fa-box-archive"></i> Archivar
           </button>
           <button onclick="toggleModal('modalNuevaTarea', true)" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2 rounded-lg font-bold shadow flex items-center gap-1">
-            <i class="fa-solid fa-plus"></i> Nueva Tarea
+            <i class="fa-solid fa-plus"></i> Nueva
           </button>
         </div>
       </div>
@@ -543,17 +592,61 @@
 
   </main>
 
-  <!-- MODAL NUEVO CORRAL -->
+  <!-- MODAL NUEVO LOTE / CORRAL -->
   <div id="modalNuevoCorral" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
     <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4">
-      <h3 class="text-lg font-bold text-slate-800">Agregar Nuevo Corral</h3>
+      <h3 class="text-lg font-bold text-slate-800">Agregar Nuevo Lote / Corral</h3>
       <div>
         <label class="block text-sm font-medium text-slate-600 mb-1">Nombre o Número</label>
-        <input type="text" id="nombreCorralInput" placeholder="Ej: Corral 1, Potrero Bajo" class="w-full border rounded-lg p-3 text-base focus:ring-2 focus:ring-emerald-500 outline-none">
+        <input type="text" id="nombreCorralInput" placeholder="Ej: Lote 2, Potrero Bajo" class="w-full border rounded-lg p-3 text-base focus:ring-2 focus:ring-emerald-500 outline-none">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-600 mb-1">Observación / Cultivo (Opcional)</label>
+        <input type="text" id="obsCorralInput" placeholder="Ej: Soja, Maíz, Pastura, etc." class="w-full border rounded-lg p-3 text-base focus:ring-2 focus:ring-emerald-500 outline-none">
       </div>
       <div class="flex justify-end gap-3 pt-2">
         <button onclick="toggleModal('modalNuevoCorral', false)" class="px-4 py-2 text-slate-600 font-semibold">Cancelar</button>
         <button onclick="crearCorral()" class="bg-emerald-600 text-white px-5 py-2 rounded-lg font-bold">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL EDITAR LOTE / CORRAL -->
+  <div id="modalEditarCorral" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4">
+      <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+        <i class="fa-solid fa-pen-to-square text-emerald-600"></i> Editar Lote / Corral
+      </h3>
+      <input type="hidden" id="editCorralIdInput">
+      <div>
+        <label class="block text-sm font-medium text-slate-600 mb-1">Nombre del Lote / Corral</label>
+        <input type="text" id="editNombreCorralInput" class="w-full border rounded-lg p-3 text-base focus:ring-2 focus:ring-emerald-500 outline-none">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-600 mb-1">Observación / Cultivo (Dejar vacío para quitar)</label>
+        <input type="text" id="editObsCorralInput" placeholder="Ej: Soja sembrada, Libre, etc." class="w-full border rounded-lg p-3 text-base focus:ring-2 focus:ring-emerald-500 outline-none">
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button onclick="toggleModal('modalEditarCorral', false)" class="px-4 py-2 text-slate-600 font-semibold">Cancelar</button>
+        <button onclick="guardarEdicionCorral()" class="bg-emerald-600 text-white px-5 py-2 rounded-lg font-bold">Actualizar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL VER TAREAS ARCHIVADAS -->
+  <div id="modalArchivadas" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+          <i class="fa-solid fa-box-archive text-slate-600"></i> Tareas Archivadas
+        </h3>
+        <button onclick="toggleModal('modalArchivadas', false)" class="text-slate-400 hover:text-slate-700 text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div id="listaTareasArchivadas" class="space-y-2 overflow-y-auto flex-1 pr-1"></div>
+      <div class="pt-2 border-t flex justify-end">
+        <button onclick="toggleModal('modalArchivadas', false)" class="bg-slate-700 text-white px-5 py-2 rounded-lg font-bold text-sm">Cerrar</button>
       </div>
     </div>
   </div>
@@ -563,7 +656,7 @@
     <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-3">
       <h3 class="text-lg font-bold text-emerald-700"><i class="fa-solid fa-circle-plus"></i> Ingresar Animales</h3>
       <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">Corral de Destino</label>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Lote / Corral de Destino</label>
         <select id="ingCorralSelect" class="w-full border rounded-lg p-3 text-sm bg-white outline-none"></select>
       </div>
       <div>
@@ -598,7 +691,7 @@
     <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-3">
       <h3 class="text-lg font-bold text-rose-700"><i class="fa-solid fa-circle-minus"></i> Egresar / Restar Animales</h3>
       <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">Corral de Origen (Sacar de aquí)</label>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Lote / Corral de Origen</label>
         <select id="egCorralSelect" class="w-full border rounded-lg p-3 text-sm bg-white outline-none"></select>
       </div>
       <div>
@@ -631,13 +724,13 @@
   <!-- MODAL 3: TRASLADAR ENTRE CORRALES -->
   <div id="modalTraslado" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
     <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-3">
-      <h3 class="text-lg font-bold text-blue-700"><i class="fa-solid fa-arrow-right-arrow-left"></i> Traslado entre Corrales</h3>
+      <h3 class="text-lg font-bold text-blue-700"><i class="fa-solid fa-arrow-right-arrow-left"></i> Traslado entre Lotes</h3>
       <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">1. Corral de Origen (De dónde salen)</label>
+        <label class="block text-xs font-medium text-slate-600 mb-1">1. Lote de Origen (De dónde salen)</label>
         <select id="trOrigenSelect" class="w-full border rounded-lg p-3 text-sm bg-white outline-none"></select>
       </div>
       <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">2. Corral de Destino (A dónde van)</label>
+        <label class="block text-xs font-medium text-slate-600 mb-1">2. Lote de Destino (A dónde van)</label>
         <select id="trDestinoSelect" class="w-full border rounded-lg p-3 text-sm bg-white outline-none"></select>
       </div>
       <div>
@@ -737,11 +830,11 @@
       <div class="space-y-2 bg-slate-50 p-3 rounded-xl text-sm">
         <label class="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" id="chkCabezas" class="w-4 h-4 text-rose-600 rounded">
-          <span>Poner cantidad de cabezas en 0 (manteniendo corrales)</span>
+          <span>Poner cantidad de cabezas en 0 (manteniendo lotes)</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" id="chkCorrales" class="w-4 h-4 text-rose-600 rounded">
-          <span>Borrar TODOS los corrales creados</span>
+          <span>Borrar TODOS los lotes/corrales creados</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" id="chkFletes" class="w-4 h-4 text-rose-600 rounded">
@@ -753,7 +846,7 @@
         </label>
         <label class="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" id="chkTareas" class="w-4 h-4 text-rose-600 rounded">
-          <span>Borrar Tablero de Tareas</span>
+          <span>Borrar Tablero de Tareas (incluyendo archivadas)</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" id="chkNotas" class="w-4 h-4 text-rose-600 rounded">
@@ -803,7 +896,9 @@
     window.toggleModal = function(id, show) {
       const modal = document.getElementById(id);
       if (show) {
-        populateSelects();
+        if (id === 'modalIngresar' || id === 'modalEgresar' || id === 'modalTraslado') {
+          populateSelects();
+        }
         modal.classList.remove('hidden');
       } else {
         modal.classList.add('hidden');
@@ -813,7 +908,7 @@
     window.abrirModal = function(id) {
       const ids = Object.keys(window.corralesData || {});
       if (ids.length === 0) {
-        alert("Primero debés crear al menos un corral con el botón '+ Nuevo Corral'.");
+        alert("Primero debés crear al menos un lote o corral con el botón '+ Nuevo Lote'.");
         return;
       }
       toggleModal(id, true);
@@ -827,10 +922,15 @@
       let totalVacas = 0;
       keys.forEach(k => { totalVacas += (corrales[k].cantidad || 0); });
 
+      let tareasActivas = 0;
+      Object.keys(tareas).forEach(k => {
+        if (!tareas[k].archivada) tareasActivas++;
+      });
+
       document.getElementById('statTotalVacas').innerText = totalVacas;
       document.getElementById('statTotalCorrales').innerText = keys.length;
       document.getElementById('statTotalFletes').innerText = fletes.length;
-      document.getElementById('statTotalTareas').innerText = Object.keys(tareas).length;
+      document.getElementById('statTotalTareas').innerText = tareasActivas;
     }
 
     function renderCorrales() {
@@ -839,21 +939,36 @@
       const keys = Object.keys(corrales);
 
       if (keys.length === 0) {
-        container.innerHTML = `<div class="bg-white p-6 rounded-xl text-center text-slate-400 text-sm">No hay corrales registrados. Creá el primero arriba.</div>`;
+        container.innerHTML = `<div class="bg-white p-6 rounded-xl text-center text-slate-400 text-sm">No hay lotes ni corrales registrados. Creá el primero arriba.</div>`;
         return;
       }
 
       container.innerHTML = keys.map(id => {
         const c = corrales[id];
+        const obsBadge = c.observacion 
+          ? `<span class="inline-block bg-amber-100 text-amber-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-amber-200">${c.observacion}</span>` 
+          : `<span class="text-xs text-slate-400 italic">Sin observación</span>`;
+
         return `
-          <div class="bg-white p-4 rounded-xl shadow flex items-center justify-between">
-            <div>
-              <h3 class="font-bold text-base text-slate-800">${c.nombre}</h3>
+          <div class="bg-white p-3.5 rounded-xl shadow flex items-center justify-between gap-2">
+            <div class="min-w-0 flex-1">
+              <h3 class="font-bold text-base text-slate-800 truncate">${c.nombre}</h3>
             </div>
-            <div class="flex items-center gap-4">
-              <span class="text-xl font-black text-emerald-700">${c.cantidad} <span class="text-xs font-normal text-slate-500">cabezas</span></span>
-              <button onclick="eliminarCorral('${id}', '${c.nombre}')" class="text-slate-300 hover:text-rose-500 p-2">
-                <i class="fa-solid fa-trash text-sm"></i>
+            
+            <div class="flex-shrink-0 text-center px-1">
+              ${obsBadge}
+            </div>
+
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <div class="text-right mr-1">
+                <span class="text-xl font-black text-emerald-700">${c.cantidad || 0}</span>
+                <span class="block text-[10px] text-slate-500 -mt-1">cabezas</span>
+              </div>
+              <button onclick="abrirEditarCorral('${id}')" class="text-slate-400 hover:text-blue-600 p-2 bg-slate-50 rounded-lg" title="Editar lote u observación">
+                <i class="fa-solid fa-pen text-xs"></i>
+              </button>
+              <button onclick="eliminarCorral('${id}', '${c.nombre.replace(/'/g, "\\'")}')" class="text-slate-300 hover:text-rose-500 p-2" title="Eliminar lote">
+                <i class="fa-solid fa-trash text-xs"></i>
               </button>
             </div>
           </div>
@@ -863,9 +978,10 @@
 
     function populateSelects() {
       const corrales = window.corralesData || {};
-      const opciones = Object.keys(corrales).map(id => 
-        `<option value="${id}">${corrales[id].nombre} (${corrales[id].cantidad} cabezas)</option>`
-      ).join('');
+      const opciones = Object.keys(corrales).map(id => {
+        const obsText = corrales[id].observacion ? ` [${corrales[id].observacion}]` : '';
+        return `<option value="${id}">${corrales[id].nombre}${obsText} (${corrales[id].cantidad || 0} cab.)</option>`;
+      }).join('');
       
       const selIng = document.getElementById('ingCorralSelect');
       const selEg = document.getElementById('egCorralSelect');
@@ -883,22 +999,46 @@
       const colTomado = document.getElementById('colTomado');
       const colEjecucion = document.getElementById('colEjecucion');
       const colCompletado = document.getElementById('colCompletado');
+      const listaArchivadas = document.getElementById('listaTareasArchivadas');
 
       let htmlTomado = '';
       let htmlEjecucion = '';
       let htmlCompletado = '';
+      let htmlArchivadas = '';
 
-      let cTomado = 0, cEjecucion = 0, cCompletado = 0;
+      let cTomado = 0, cEjecucion = 0, cCompletado = 0, cArchivadas = 0;
 
       Object.keys(tareas).forEach(id => {
         const t = tareas[id];
+
+        if (t.archivada) {
+          cArchivadas++;
+          htmlArchivadas += `
+            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-between items-start gap-2 text-xs">
+              <div class="space-y-1">
+                <p class="font-bold text-slate-800 text-sm">${t.titulo}</p>
+                <p class="text-slate-600">${t.observaciones || 'Sin descripción'}</p>
+              </div>
+              <div class="flex flex-col gap-1 flex-shrink-0">
+                <button onclick="restaurarTarea('${id}')" class="px-2 py-1 bg-indigo-100 text-indigo-700 rounded font-bold hover:bg-indigo-200" title="Devolver al tablero">
+                  <i class="fa-solid fa-rotate-left"></i>
+                </button>
+                <button onclick="eliminarTarea('${id}')" class="px-2 py-1 bg-rose-100 text-rose-700 rounded font-bold hover:bg-rose-200" title="Borrar definitivamente">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              </div>
+            </div>
+          `;
+          return;
+        }
+
         const cardHTML = `
           <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 space-y-2 text-xs">
             <div class="flex justify-between items-start gap-2">
               <span class="font-bold text-slate-800 text-sm">${t.titulo}</span>
               <button onclick="eliminarTarea('${id}')" class="text-slate-300 hover:text-rose-500"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            <div onclick="editarObsTarea('${id}', '${t.observaciones || ''}')" class="text-slate-600 bg-slate-50 p-2 rounded cursor-pointer hover:bg-slate-100 transition border border-dashed border-slate-200" title="Hacé clic para editar detalles">
+            <div onclick="editarObsTarea('${id}')" class="text-slate-600 bg-slate-50 p-2 rounded cursor-pointer hover:bg-slate-100 transition border border-dashed border-slate-200" title="Hacé clic para editar detalles">
               <i class="fa-regular fa-pen-to-square text-slate-400 mr-1"></i> ${t.observaciones || 'Sin detalles (tocá para agregar)'}
             </div>
             <div class="flex justify-between items-center pt-1 border-t border-slate-100">
@@ -927,10 +1067,15 @@
       colTomado.innerHTML = htmlTomado || '<p class="text-xs text-slate-400 text-center py-4">Sin tareas</p>';
       colEjecucion.innerHTML = htmlEjecucion || '<p class="text-xs text-slate-400 text-center py-4">Sin tareas</p>';
       colCompletado.innerHTML = htmlCompletado || '<p class="text-xs text-slate-400 text-center py-4">Sin tareas</p>';
+      
+      if (listaArchivadas) {
+        listaArchivadas.innerHTML = htmlArchivadas || '<p class="text-xs text-slate-400 text-center py-6">No hay tareas archivadas aún.</p>';
+      }
 
       document.getElementById('countTomado').innerText = cTomado;
       document.getElementById('countEjecucion').innerText = cEjecucion;
       document.getElementById('countCompletado').innerText = cCompletado;
+      document.getElementById('countArchivadasBtn').innerText = cArchivadas;
     }
 
     function renderNotas() {
