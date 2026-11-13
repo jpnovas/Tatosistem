@@ -3,9 +3,384 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Administracion Encargado de Mantenimiento</title>
+  <title>Tatosistem | Gestión de HaciendX</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --forest: #233d2e;
+      --forest-deep: #182b21;
+      --moss: #71834d;
+      --sage: #dce4cf;
+      --cream: #f5f2e9;
+      --paper: #fffefa;
+      --soil: #b66e48;
+      --ink: #28362b;
+      --muted: #839080;
+      --line: #e8e5d9;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      background: var(--cream);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: -.015em;
+    }
+
+    .app-shell { min-height: 100vh; }
+
+    .sidebar {
+      position: fixed;
+      inset: 0 auto 0 0;
+      z-index: 30;
+      display: flex;
+      width: 252px;
+      flex-direction: column;
+      padding: 28px 18px 20px;
+      background:
+        radial-gradient(ellipse at 4% 100%, rgba(148, 166, 104, .16), transparent 18rem),
+        var(--forest-deep);
+      color: #f5f2e9;
+    }
+
+    .sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 2px 8px 30px;
+      border-bottom: 1px solid rgba(255,255,255,.1);
+    }
+
+    .brand-mark {
+      display: grid;
+      width: 42px;
+      height: 42px;
+      flex: 0 0 42px;
+      place-items: center;
+      border: 1px solid rgba(227, 236, 208, .26);
+      border-radius: 14px 14px 14px 5px;
+      background: #536744;
+      color: #f2e4bb;
+      font-size: 19px;
+      transform: rotate(-3deg);
+    }
+
+    .brand-copy { line-height: 1.15; }
+    .brand-copy strong { display: block; font-size: 15px; letter-spacing: .12em; }
+    .brand-copy span { display: block; margin-top: 5px; color: #aab79d; font-size: 9px; letter-spacing: .15em; }
+
+    .nav-caption {
+      margin: 28px 10px 11px;
+      color: #899885;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: .17em;
+    }
+
+    .side-nav { display: grid; gap: 7px; }
+
+    .side-nav button {
+      display: flex;
+      min-height: 48px;
+      align-items: center;
+      gap: 13px;
+      padding: 0 13px;
+      border: 1px solid transparent;
+      border-radius: 11px;
+      background: transparent;
+      color: #bdc7b9;
+      cursor: pointer;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 650;
+      text-align: left;
+      transition: background .22s ease, color .22s ease, transform .22s ease;
+    }
+
+    .side-nav button i { width: 18px; color: #96a68d; text-align: center; }
+    .side-nav button:hover { background: rgba(255,255,255,.07); color: white; transform: translateX(2px); }
+    .side-nav button[class*="bg-"] {
+      border-color: rgba(236, 232, 199, .16);
+      background: #71834d !important;
+      box-shadow: 0 8px 20px rgba(4, 17, 9, .18);
+      color: #fffdf3 !important;
+    }
+    .side-nav button[class*="bg-"] i { color: #f0dfb1; }
+
+    .sidebar-foot {
+      margin-top: auto;
+      padding: 15px 12px;
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 12px;
+      background: rgba(255,255,255,.045);
+    }
+
+    .sidebar-foot span { display: block; color: #95a48d; font-size: 9px; letter-spacing: .12em; }
+    .sidebar-foot strong { display: block; margin-top: 5px; color: #f5f2e9; font-size: 12px; }
+    .sidebar-foot p { margin: 8px 0 0; color: #a8b5a0; font-size: 10px; }
+
+    .main-column { min-height: 100vh; margin-left: 252px; }
+
+    .dashboard-content {
+      width: min(100%, 1450px);
+      margin: 0 auto;
+      padding: 32px clamp(22px, 4vw, 58px) 68px;
+    }
+
+    .field-hero {
+      position: relative;
+      display: flex;
+      min-height: 276px;
+      align-items: center;
+      overflow: hidden;
+      padding: 38px 42px;
+      border: 1px solid rgba(238, 236, 220, .35);
+      border-radius: 22px;
+      background: #263d2e;
+      box-shadow: 0 20px 46px rgba(52, 69, 43, .14);
+      color: #f7f3e7;
+      isolation: isolate;
+    }
+
+    .field-hero::before {
+      position: absolute;
+      z-index: -1;
+      inset: 0;
+      background: linear-gradient(90deg, rgba(24, 43, 32, .96) 0%, rgba(31, 54, 38, .84) 40%, rgba(38, 61, 43, .08) 100%);
+      content: "";
+    }
+
+    .field-hero::after {
+      position: absolute;
+      z-index: -1;
+      inset: 0;
+      background-image: radial-gradient(rgba(249, 242, 219, .12) .7px, transparent .7px);
+      background-size: 5px 5px;
+      content: "";
+      opacity: .14;
+      pointer-events: none;
+    }
+
+    .hero-art {
+      position: absolute;
+      z-index: -2;
+      top: 0;
+      right: 0;
+      width: min(66%, 730px);
+      height: 100%;
+      animation: landscape-in 1.2s cubic-bezier(.2,.7,.2,1) both;
+    }
+
+    .hero-art svg { width: 100%; height: 100%; }
+    .hero-copy { max-width: 510px; animation: rise-in .7s ease-out both; }
+    .hero-eyebrow { color: #c4cf9f; font-size: 9px; font-weight: 800; letter-spacing: .22em; }
+    .hero-copy h1 { margin: 13px 0 10px; font-size: clamp(34px, 4vw, 53px); font-weight: 650; letter-spacing: -.065em; line-height: .99; }
+    .hero-copy h1 em { color: #d9c68e; font-style: normal; }
+    .hero-copy > p { max-width: 365px; margin: 0; color: #c4cebd; font-size: 12px; line-height: 1.65; }
+    .hero-live { display: inline-flex; align-items: center; gap: 9px; margin-top: 24px; color: #dce5d2; font-size: 10px; }
+    .hero-live i { color: #bfd184; font-size: 9px; }
+
+    .section-kicker {
+      margin: 28px 0 13px;
+      color: #88917c;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: .18em;
+    }
+
+    .stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px; }
+    .stat-card {
+      position: relative;
+      display: flex;
+      min-height: 116px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 19px;
+      overflow: hidden;
+      border: 1px solid #e8e5d9;
+      border-radius: 15px;
+      background: var(--paper);
+      box-shadow: 0 7px 20px rgba(65, 73, 52, .035);
+      transition: transform .25s ease, box-shadow .25s ease;
+    }
+    .stat-card:hover { box-shadow: 0 13px 28px rgba(65, 73, 52, .1); transform: translateY(-4px); }
+    .stat-card p:first-child { margin: 0; color: #8d9688; font-size: 9px; font-weight: 800; letter-spacing: .14em; }
+    .stat-card p:last-child { margin: 7px 0 0; color: #2f4032; font-size: 30px; font-weight: 700; letter-spacing: -.06em; line-height: 1; }
+    .stat-icon { display: grid; width: 43px; height: 43px; place-items: center; border-radius: 13px; font-size: 16px; }
+    .stat-card:nth-child(1) .stat-icon { background: #e9eedc; color: #6f8049; }
+    .stat-card:nth-child(2) .stat-icon { background: #f5e9d8; color: #ad7547; }
+    .stat-card:nth-child(3) .stat-icon { background: #e3ebe5; color: #56816b; }
+    .stat-card:nth-child(4) .stat-icon { background: #eee8d8; color: #9c8955; }
+
+    .section-surface {
+      margin-top: 30px;
+      padding: 25px;
+      border: 1px solid #e8e5d9;
+      border-radius: 18px;
+      background: rgba(255, 254, 250, .84);
+      box-shadow: 0 8px 26px rgba(65, 73, 52, .035);
+      animation: rise-in .45s ease-out both;
+    }
+
+    #seccionCorrales > .flex:first-child,
+    #seccionFletes > .flex:first-child,
+    #seccionTareas > .flex:first-child,
+    #seccionHistorial > .flex:first-child { margin-bottom: 20px; }
+
+    main h2 { color: #344435 !important; font-size: 17px !important; }
+    main h3 { color: #344435; }
+    #seccionCorrales h2 i, #seccionFletes h2 i, #seccionTareas h2 i, #seccionHistorial h2 i { color: #87945c; }
+
+    main button { transition: transform .2s ease, box-shadow .2s ease, filter .2s ease; }
+    main button:hover { filter: brightness(1.04); }
+    main button:active { transform: scale(.98); }
+
+    #seccionCorrales > .flex:first-child button,
+    #seccionFletes > .flex:first-child button,
+    #seccionTareas > .flex:first-child button { border-radius: 10px !important; box-shadow: none !important; }
+
+    #seccionCorrales > .grid { gap: 12px !important; }
+    #seccionCorrales > .grid button {
+      min-height: 88px;
+      align-items: flex-start;
+      padding: 17px 18px !important;
+      border: 1px solid transparent;
+      border-radius: 14px !important;
+      box-shadow: 0 8px 18px rgba(51, 65, 45, .08) !important;
+      text-align: left;
+    }
+    #seccionCorrales > .grid button:nth-child(1) { background: #71834d !important; }
+    #seccionCorrales > .grid button:nth-child(2) { background: #bd7657 !important; }
+    #seccionCorrales > .grid button:nth-child(3) { background: #527b6b !important; }
+    #seccionCorrales > .grid button i { font-size: 18px !important; }
+    #seccionCorrales > .grid button span { font-size: 10px !important; letter-spacing: .12em; }
+
+    #seccionCorrales > section { margin-top: 27px; }
+    #seccionCorrales > section h3 { margin-bottom: 12px; font-size: 12px; }
+    #listaCorrales > div, #listaFletes > div {
+      border: 1px solid #e9e6db;
+      border-radius: 13px !important;
+      background: #fffefa;
+      box-shadow: 0 4px 14px rgba(65, 73, 52, .035) !important;
+      transition: border-color .2s ease, transform .2s ease;
+    }
+    #listaCorrales > div:hover, #listaFletes > div:hover { border-color: #cbd4b8; transform: translateY(-2px); }
+    #listaCorrales h3 { font-size: 14px; }
+    #listaCorrales span.text-xl { color: #71834d !important; }
+
+    #seccionFletes > #resumenFletesBox {
+      min-height: 66px;
+      border-color: #dfe5d6 !important;
+      border-radius: 12px !important;
+      background: #eef2e7 !important;
+    }
+    #seccionFletes > #resumenFletesBox strong { color: #4e6744 !important; }
+
+    #seccionTareas > .grid { gap: 12px !important; }
+    #seccionTareas > .grid > div {
+      border: 1px solid #e8e5d9;
+      border-radius: 13px !important;
+      background: #f2f1e9;
+    }
+    #seccionTareas > .grid > div:nth-child(2) { background: #f6f0e2; border-color: #ece0c5; }
+    #seccionTareas > .grid > div:nth-child(3) { background: #eaf0e7; border-color: #d9e3d3; }
+    #seccionTareas > div:last-child {
+      border: 1px solid #e8e5d9;
+      border-radius: 14px !important;
+      background: #fffefa;
+      box-shadow: 0 5px 18px rgba(65, 73, 52, .04);
+    }
+
+    #listaHistorial {
+      border: 1px solid #e8e5d9;
+      border-radius: 13px !important;
+      background: #fffefa;
+      box-shadow: 0 5px 18px rgba(65, 73, 52, .04);
+    }
+    #listaHistorial > div { padding: 15px 18px; }
+
+    input, select {
+      border-color: #dfdfd2 !important;
+      border-radius: 9px !important;
+      background-color: #fffefa !important;
+    }
+    input:focus, select:focus {
+      border-color: #8b9b66 !important;
+      box-shadow: 0 0 0 3px rgba(113, 131, 77, .14) !important;
+    }
+    body > div[id^="modal"] > div {
+      border: 1px solid #e9e6db;
+      border-radius: 18px !important;
+      box-shadow: 0 26px 70px rgba(31, 43, 28, .27) !important;
+    }
+
+    @keyframes pulse-dot { 50% { opacity: .45; transform: scale(.8); } }
+    @keyframes rise-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes landscape-in { from { opacity: .5; transform: translateX(22px) scale(1.03); } to { opacity: 1; transform: translateX(0) scale(1); } }
+
+    @media (max-width: 980px) {
+      .sidebar { width: 214px; }
+      .main-column { margin-left: 214px; }
+      .dashboard-content { padding-right: 24px; padding-left: 24px; }
+      .field-hero { min-height: 250px; padding: 32px; }
+      .stat-grid { gap: 9px; }
+      .stat-card { min-height: 102px; padding: 15px 13px; }
+      .stat-icon { width: 37px; height: 37px; }
+    }
+
+    @media (max-width: 720px) {
+      .sidebar {
+        inset: auto 0 0;
+        width: 100%;
+        height: 72px;
+        flex-direction: row;
+        padding: 7px 9px max(7px, env(safe-area-inset-bottom));
+        border-top: 1px solid rgba(255,255,255,.1);
+      }
+      .sidebar-brand, .sidebar-foot, .nav-caption { display: none; }
+      .side-nav { display: grid; width: 100%; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+      .side-nav button { min-height: 56px; flex-direction: column; justify-content: center; gap: 4px; padding: 3px 1px; border-radius: 9px; font-size: 10px; text-align: center; }
+      .side-nav button i { width: auto; font-size: 15px; }
+      .side-nav button:hover { transform: translateY(-1px); }
+      .main-column { margin-left: 0; padding-bottom: 70px; }
+      .dashboard-content { padding: 19px 15px 32px; }
+      .field-hero { min-height: 175px; padding: 16px 18px; border-radius: 17px; }
+      .hero-art { right: -18%; width: 93%; opacity: .72; }
+      .field-hero::before { background: linear-gradient(90deg, rgba(24,43,32,.97), rgba(31,54,38,.78) 58%, rgba(38,61,43,.23)); }
+      .hero-eyebrow { font-size: 10px; letter-spacing: .16em; }
+      .hero-copy h1 { margin: 8px 0 6px; font-size: clamp(32px, 8.5vw, 37px); line-height: .92; }
+      .hero-copy > p { max-width: 285px; font-size: 12px; line-height: 1.4; }
+      .hero-live { display: none; }
+      .section-kicker { margin-top: 23px; font-size: 10px; }
+      .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+      .stat-card { min-height: 91px; padding: 13px; border-radius: 12px; }
+      .stat-card p:first-child { font-size: 10px; }
+      .stat-card p:last-child { font-size: 25px; }
+      .stat-icon { width: 34px; height: 34px; border-radius: 10px; font-size: 13px; }
+      .section-surface { margin-top: 21px; padding: 17px 14px; border-radius: 15px; }
+      #seccionCorrales > .grid { gap: 8px !important; }
+      #seccionCorrales > .grid button { min-height: 75px; padding: 12px !important; }
+      #seccionCorrales > .grid button span { font-size: 11px !important; }
+    }
+
+    @media (max-width: 400px) {
+      .field-hero { min-height: 165px; padding: 14px 16px; }
+      .hero-art { right: -33%; width: 116%; }
+      .hero-copy h1 { font-size: 32px; }
+      #seccionCorrales > .flex:first-child { align-items: flex-start; gap: 8px; }
+      #seccionCorrales > .flex:first-child h2 { font-size: 15px !important; }
+      #seccionCorrales > .flex:first-child button { white-space: nowrap; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+  </style>
 
   <!-- Firebase App & Realtime Database SDKs -->
   <script type="module">
@@ -372,52 +747,99 @@
     };
   </script>
 </head>
-<body class="bg-slate-100 text-slate-800 font-sans min-h-screen pb-20">
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-mark"><i class="fa-solid fa-cow"></i></div>
+        <div class="brand-copy">
+          <strong>TATOSISTEM</strong>
+          <span>GESTIÓN RURAL</span>
+        </div>
+      </div>
+      <p class="nav-caption">MENÚ PRINCIPAL</p>
+      <nav class="side-nav" aria-label="Navegación principal">
+        <button onclick="cambiarTab('corrales')" id="btnTabCorrales" class="bg-emerald-600 text-white"><i class="fa-solid fa-wheat-awn"></i><span>Stock</span></button>
+        <button onclick="cambiarTab('fletes')" id="btnTabFletes"><i class="fa-solid fa-truck-field"></i><span>Fletes</span></button>
+        <button onclick="cambiarTab('tareas')" id="btnTabTareas"><i class="fa-solid fa-list-check"></i><span>Tablero</span></button>
+        <button onclick="cambiarTab('historial')" id="btnTabHistorial"><i class="fa-solid fa-clock-rotate-left"></i><span>Historial</span></button>
+      </nav>
+      <div class="sidebar-foot">
+        <span>ESTABLECIMIENTO</span>
+        <strong>Esteban Company</strong>
+        <p><i class="fa-solid fa-location-dot"></i> Operaciones de campo</p>
+      </div>
+    </aside>
 
-  <!-- Encabezado Principal Actualizado -->
-  <header class="bg-emerald-700 text-white p-4 shadow-md sticky top-0 z-10">
-    <div class="max-w-3xl mx-auto flex justify-between items-center">
-      <div>
-        <h1 class="text-xl font-bold flex items-center gap-2">
-          <i class="fa-solid font-bold fa-cow"></i> Administracion Encargado de Mantenimiento
-        </h1>
-        <p class="text-xs text-emerald-200">programado para Esteban Company</p>
-      </div>
-    </div>
-  </header>
+    <div class="main-column">
+      <main class="dashboard-content">
+        <section class="field-hero">
+          <div class="hero-copy">
+            <div class="hero-eyebrow">ESTEBAN COMPANY &nbsp; / &nbsp; GESTIÓN DE HACIENDX</div>
+            <h1>El campo,<br><em>en orden.</em></h1>
+            <p>Todo lo que pasa en el establecimiento, en un solo lugar. Stock, movimientos y trabajo diario.</p>
+            <div class="hero-live"><i class="fa-solid fa-circle"></i> Seguimiento operativo en tiempo real</div>
+          </div>
+          <div class="hero-art" aria-hidden="true">
+            <svg viewBox="0 0 760 330" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#b9bb86"/><stop offset="1" stop-color="#e0c58c"/></linearGradient>
+                <linearGradient id="fieldFar" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#9a9d68"/><stop offset="1" stop-color="#708052"/></linearGradient>
+                <linearGradient id="fieldNear" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#69794c"/><stop offset="1" stop-color="#3d5d40"/></linearGradient>
+                <radialGradient id="sun"><stop stop-color="#f8e6a8" stop-opacity=".85"/><stop offset="1" stop-color="#f8e6a8" stop-opacity="0"/></radialGradient>
+              </defs>
+              <rect width="760" height="330" fill="url(#sky)"/>
+              <circle cx="570" cy="82" r="115" fill="url(#sun)"/>
+              <circle cx="570" cy="82" r="26" fill="#f3dda0" opacity=".8"/>
+              <path d="M0 164 Q140 116 260 155 T500 145 T760 160 V330 H0Z" fill="#8a9365"/>
+              <path d="M0 206 Q150 151 315 191 T590 177 T760 196 V330 H0Z" fill="url(#fieldFar)"/>
+              <path d="M0 246 Q160 185 345 224 T650 210 T760 222 V330 H0Z" fill="url(#fieldNear)"/>
+              <g fill="none" stroke="#d7cc91" stroke-opacity=".42" stroke-width="2">
+                <path d="M-50 330 Q130 219 345 220"/><path d="M35 345 Q205 229 390 218"/>
+                <path d="M150 345 Q286 238 444 222"/><path d="M300 345 Q387 255 507 228"/>
+                <path d="M450 345 Q500 273 579 235"/>
+              </g>
+              <g transform="translate(460 143)">
+                <path d="M0 25 43 0 85 25V76H0Z" fill="#634d37"/>
+                <path d="M-8 26 43-7 93 26" fill="none" stroke="#e1c38a" stroke-width="7" stroke-linejoin="round"/>
+                <path d="M33 44H53V76H33Z" fill="#b8875e"/>
+                <path d="M10 39H24V53H10Z" fill="#e2cd9e"/>
+                <path d="M62 39H76V53H62Z" fill="#e2cd9e"/>
+              </g>
+              <g fill="#283b2e" opacity=".88">
+                <path d="M625 213c0-9 7-15 17-15 7 0 12 3 15 8l12 2 7 8-4 5h-6l-2 12h-5l-1-11h-15l-2 11h-5l-1-12c-6-2-10-4-10-8Zm30-11 5-9 7 2-1 8Z"/>
+                <path d="M684 222c0-7 6-12 14-12 6 0 10 2 13 6l10 2 6 7-4 4h-5l-1 10h-5l-1-9h-12l-2 9h-4l-1-10c-5-1-8-3-8-7Zm25-10 4-7 6 2-1 6Z"/>
+              </g>
+              <g stroke="#d4c38e" stroke-opacity=".65" stroke-width="2">
+                <path d="M382 195v31M402 193v28M422 190v28M382 199l40-5"/>
+              </g>
+            </svg>
+          </div>
+        </section>
 
-  <main class="max-w-3xl mx-auto p-4 space-y-6">
-
-    <!-- Pestañas de Navegación Visual -->
-    <div class="grid grid-cols-4 bg-white rounded-xl shadow p-1 gap-1 text-center">
-      <button onclick="cambiarTab('corrales')" id="btnTabCorrales" class="py-2 font-bold text-xs rounded-lg bg-emerald-600 text-white transition">Stock</button>
-      <button onclick="cambiarTab('fletes')" id="btnTabFletes" class="py-2 font-bold text-xs rounded-lg text-slate-600 transition">Fletes</button>
-      <button onclick="cambiarTab('tareas')" id="btnTabTareas" class="py-2 font-bold text-xs rounded-lg text-slate-600 transition">Tablero</button>
-      <button onclick="cambiarTab('historial')" id="btnTabHistorial" class="py-2 font-bold text-xs rounded-lg text-slate-600 transition">Historial</button>
-    </div>
-
-    <!-- TARJETAS DE RESUMEN -->
-    <section class="grid grid-cols-4 gap-2">
-      <div class="bg-white p-2.5 rounded-xl shadow border-l-4 border-emerald-600">
-        <p class="text-[9px] font-bold text-slate-400 uppercase">Cabezas</p>
-        <p id="statTotalVacas" class="text-xl font-black text-slate-800">0</p>
-      </div>
-      <div class="bg-white p-2.5 rounded-xl shadow border-l-4 border-blue-600">
-        <p class="text-[9px] font-bold text-slate-400 uppercase">Corrales</p>
-        <p id="statTotalCorrales" class="text-xl font-black text-slate-800">0</p>
-      </div>
-      <div class="bg-white p-2.5 rounded-xl shadow border-l-4 border-amber-500">
-        <p class="text-[9px] font-bold text-slate-400 uppercase">Fletes</p>
-        <p id="statTotalFletes" class="text-xl font-black text-slate-800">0</p>
-      </div>
-      <div class="bg-white p-2.5 rounded-xl shadow border-l-4 border-indigo-500">
-        <p class="text-[9px] font-bold text-slate-400 uppercase">Tareas</p>
-        <p id="statTotalTareas" class="text-xl font-black text-slate-800">0</p>
-      </div>
-    </section>
+        <p class="section-kicker">EL ESTABLECIMIENTO &nbsp; / &nbsp; RESUMEN GENERAL</p>
+        <!-- TARJETAS DE RESUMEN -->
+        <section class="stat-grid">
+          <div class="stat-card">
+            <div><p>CABEZAS</p><p id="statTotalVacas">0</p></div>
+            <span class="stat-icon"><i class="fa-solid fa-cow"></i></span>
+          </div>
+          <div class="stat-card">
+            <div><p>CORRALES</p><p id="statTotalCorrales">0</p></div>
+            <span class="stat-icon"><i class="fa-solid fa-fence"></i></span>
+          </div>
+          <div class="stat-card">
+            <div><p>FLETES</p><p id="statTotalFletes">0</p></div>
+            <span class="stat-icon"><i class="fa-solid fa-truck"></i></span>
+          </div>
+          <div class="stat-card">
+            <div><p>TAREAS</p><p id="statTotalTareas">0</p></div>
+            <span class="stat-icon"><i class="fa-solid fa-clipboard-check"></i></span>
+          </div>
+        </section>
 
     <!-- SECCIÓN 1: CORRALES Y ACCIONES -->
-    <div id="seccionCorrales" class="space-y-4">
+    <div id="seccionCorrales" class="section-surface space-y-4">
       <div class="flex justify-between items-center">
         <h2 class="text-md font-bold text-slate-700 flex items-center gap-2">
           <i class="fa-solid fa-layer-group"></i> Operaciones de Hacienda
@@ -449,7 +871,7 @@
     </div>
 
     <!-- SECCIÓN 2: FLETES -->
-    <div id="seccionFletes" class="space-y-4 hidden">
+    <div id="seccionFletes" class="section-surface space-y-4 hidden">
       <div class="flex justify-between items-center">
         <h2 class="text-md font-bold text-slate-700 flex items-center gap-2">
           <i class="fa-solid fa-truck-moving"></i> Registro de Transportes y DTE
@@ -467,7 +889,7 @@
     </div>
 
     <!-- SECCIÓN 3: TABLERO KANBAN Y NOTAS RÁPIDAS -->
-    <div id="seccionTareas" class="space-y-4 hidden">
+    <div id="seccionTareas" class="section-surface space-y-4 hidden">
       <div class="flex justify-between items-center">
         <div>
           <h2 class="text-md font-bold text-slate-700 flex items-center gap-2">
@@ -529,7 +951,7 @@
     </div>
 
     <!-- SECCIÓN 4: HISTORIAL Y RESET SEGURO -->
-    <div id="seccionHistorial" class="space-y-4 hidden">
+    <div id="seccionHistorial" class="section-surface space-y-4 hidden">
       <div class="flex justify-between items-center">
         <h2 class="text-md font-bold text-slate-700 flex items-center gap-2">
           <i class="fa-solid fa-clock-rotate-left"></i> Historial de Movimientos
@@ -541,7 +963,9 @@
       <div id="listaHistorial" class="bg-white rounded-xl shadow divide-y divide-slate-100 max-h-96 overflow-y-auto"></div>
     </div>
 
-  </main>
+      </main>
+    </div>
+  </div>
 
   <!-- MODAL NUEVO CORRAL -->
   <div id="modalNuevoCorral" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
