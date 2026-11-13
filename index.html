@@ -86,7 +86,7 @@
       }
     };
 
-    // 1. ACCIÓN: INGRESAR (SUMAR)
+    // 1. INGRESAR
     window.ejecutarIngreso = function() {
       const corralId = document.getElementById('ingCorralSelect').value;
       const cantidad = parseInt(document.getElementById('ingCantidadInput').value, 10);
@@ -122,7 +122,7 @@
       });
     };
 
-    // 2. ACCIÓN: EGRESAR (RESTAR)
+    // 2. EGRESAR
     window.ejecutarEgreso = function() {
       const corralId = document.getElementById('egCorralSelect').value;
       const cantidad = parseInt(document.getElementById('egCantidadInput').value, 10);
@@ -164,7 +164,7 @@
       });
     };
 
-    // 3. ACCIÓN: TRASLADAR
+    // 3. TRASLADAR
     window.ejecutarTraslado = function() {
       const origenId = document.getElementById('trOrigenSelect').value;
       const destinoId = document.getElementById('trDestinoSelect').value;
@@ -215,7 +215,7 @@
       });
     };
 
-    // GESTIÓN DE FLETES
+    // GESTIÓN DE FLETES (CON CAMBIO DE ESTADO DE PAGO)
     window.guardarFlete = function() {
       const transportista = document.getElementById('fleteTransportista').value.trim();
       const chofer = document.getElementById('fleteChofer').value.trim();
@@ -245,13 +245,18 @@
       });
     };
 
+    window.toggleEstadoPagoFlete = function(id, estadoActual) {
+      const nuevoEstado = estadoActual === 'Pagado' ? 'Pendiente' : 'Pagado';
+      update(ref(db, `fletes/${id}`), { estadoPago: nuevoEstado });
+    };
+
     window.eliminarFlete = function(id) {
       if (confirm("¿Eliminar este registro de flete?")) {
         remove(ref(db, `fletes/${id}`));
       }
     };
 
-    // GESTIÓN DE KANBAN (TRABAJOS)
+    // GESTIÓN DE KANBAN (CON EDICIÓN DE OBSERVACIONES)
     window.guardarTarea = function() {
       const titulo = document.getElementById('tareaTituloInput').value.trim();
       const observaciones = document.getElementById('tareaObsInput').value.trim();
@@ -264,7 +269,7 @@
       set(nuevaTareaRef, {
         titulo,
         observaciones,
-        estado: 'tomado', // tomado, en_ejecucion, completado
+        estado: 'tomado',
         timestamp: Date.now()
       }).then(() => {
         document.getElementById('tareaTituloInput').value = '';
@@ -275,6 +280,13 @@
 
     window.cambiarEstadoTarea = function(id, nuevoEstado) {
       update(ref(db, `tareas/${id}`), { estado: nuevoEstado });
+    };
+
+    window.editarObsTarea = function(id, obsActual) {
+      const nuevaObs = prompt("Actualizar observaciones o detalles:", obsActual || "");
+      if (nuevaObs !== null) {
+        update(ref(db, `tareas/${id}`), { observaciones: nuevaObs.trim() });
+      }
     };
 
     window.eliminarTarea = function(id) {
@@ -360,7 +372,7 @@
       </div>
     </section>
 
-    <!-- SECCIÓN 1: CORRALES Y BOTONES DE ACCIÓN -->
+    <!-- SECCIÓN 1: CORRALES Y ACCIONES -->
     <div id="seccionCorrales" class="space-y-4">
       <div class="flex justify-between items-center">
         <h2 class="text-md font-bold text-slate-700 flex items-center gap-2">
@@ -412,7 +424,7 @@
           <h2 class="text-md font-bold text-slate-700 flex items-center gap-2">
             <i class="fa-solid fa-clipboard-list"></i> Tablero de Labores del Campo
           </h2>
-          <p class="text-xs text-slate-400">Organización rápida de tareas pendientes</p>
+          <p class="text-xs text-slate-400">Tocá una tarea para editar sus detalles</p>
         </div>
         <button onclick="toggleModal('modalNuevaTarea', true)" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2 rounded-lg font-bold shadow flex items-center gap-1">
           <i class="fa-solid fa-plus"></i> Nueva Tarea
@@ -635,11 +647,11 @@
       <h3 class="text-lg font-bold text-indigo-700"><i class="fa-solid fa-clipboard-list"></i> Nueva Tarea de Campo</h3>
       <div>
         <label class="block text-xs font-medium text-slate-600 mb-1">¿Qué hay que hacer?</label>
-        <input type="text" id="tareaTituloInput" placeholder="Ej: Arreglar alambre potrero 3" class="w-full border rounded-lg p-3 text-sm outline-none">
+        <input type="text" id="tareaTituloInput" placeholder="Ej: Vacunar terneros" class="w-full border rounded-lg p-3 text-sm outline-none">
       </div>
       <div>
         <label class="block text-xs font-medium text-slate-600 mb-1">Observaciones / Detalles</label>
-        <input type="text" id="tareaObsInput" placeholder="Ej: Llevar grampas y pinza" class="w-full border rounded-lg p-3 text-sm outline-none">
+        <input type="text" id="tareaObsInput" placeholder="Ej: Comprar vacunas y jeringas" class="w-full border rounded-lg p-3 text-sm outline-none">
       </div>
       <div class="flex justify-end gap-3 pt-2">
         <button onclick="toggleModal('modalNuevaTarea', false)" class="px-4 py-2 text-slate-600 font-semibold text-sm">Cancelar</button>
@@ -648,13 +660,13 @@
     </div>
   </div>
 
-  <!-- MODAL REINICIO SEGURO (CHECKBOXES + BORRAR) -->
+  <!-- MODAL REINICIO SEGURO -->
   <div id="modalReset" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
     <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4">
       <h3 class="text-lg font-bold text-rose-700 flex items-center gap-2">
         <i class="fa-solid fa-triangle-exclamation"></i> Reinicio o Limpieza de Base
       </h3>
-      <p class="text-xs text-slate-500">Seleccioná qué elementos deseás borrar o restablecer:</p>
+      <p class="text-xs text-slate-500">Seleccioná qué elementos deseás borrar y escribí BORRAR para confirmar:</p>
       
       <div class="space-y-2 bg-slate-50 p-3 rounded-xl text-sm">
         <label class="flex items-center gap-2 cursor-pointer">
@@ -680,7 +692,7 @@
       </div>
 
       <div class="space-y-1">
-        <label class="block text-xs font-bold text-slate-700">Para confirmar, escribí la palabra <span class="text-rose-600 font-extrabold">BORRAR</span>:</label>
+        <label class="block text-xs font-bold text-slate-700">Escribí <span class="text-rose-600 font-extrabold">BORRAR</span> para habilitar el botón:</label>
         <input type="text" id="inputPalabraBorrar" placeholder="Escribí BORRAR aquí" class="w-full border rounded-lg p-2.5 text-sm uppercase outline-none focus:ring-2 focus:ring-rose-500">
       </div>
 
@@ -816,7 +828,9 @@
               <span class="font-bold text-slate-800 text-sm">${t.titulo}</span>
               <button onclick="eliminarTarea('${id}')" class="text-slate-300 hover:text-rose-500"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            ${t.observaciones ? `<p class="text-slate-500 bg-slate-50 p-1.5 rounded">${t.observaciones}</p>` : ''}
+            <div onclick="editarObsTarea('${id}', '${t.observaciones || ''}')" class="text-slate-600 bg-slate-50 p-2 rounded cursor-pointer hover:bg-slate-100 transition border border-dashed border-slate-200" title="Hacé clic para editar detalles">
+              <i class="fa-regular fa-pen-to-square text-slate-400 mr-1"></i> ${t.observaciones || 'Sin detalles (tocá para agregar)'}
+            </div>
             <div class="flex justify-between items-center pt-1 border-t border-slate-100">
               <div class="flex gap-1">
                 ${t.estado !== 'tomado' ? `<button onclick="cambiarEstadoTarea('${id}', '${t.estado === 'completado' ? 'en_ejecucion' : 'tomado'}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-600"><i class="fa-solid fa-chevron-left"></i></button>` : ''}
@@ -920,7 +934,10 @@
               <div><span class="text-slate-400">Destino:</span> <strong class="text-slate-700">${f.destino || 'N/D'}</strong></div>
               <div><span class="text-slate-400">Costo:</span> <strong class="text-slate-700">$${f.costo.toLocaleString()}</strong></div>
             </div>
-            <div class="flex justify-end pt-1">
+            <div class="flex justify-between items-center pt-1">
+              <button onclick="toggleEstadoPagoFlete('${f.id}', '${f.estadoPago}')" class="text-xs text-blue-600 hover:underline font-semibold">
+                <i class="fa-solid fa-rotate mr-1"></i> Cambiar a ${f.estadoPago === 'Pagado' ? 'Pendiente' : 'Pagado'}
+              </button>
               <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full ${pagoClase}">Pago: ${f.estadoPago}</span>
             </div>
           </div>
