@@ -38,19 +38,6 @@
     window.historialData = [];
     window.fletesData = [];
 
-    // Detector de estado de red visual
-    window.addEventListener('online', () => {
-      const banner = document.getElementById('estadoConexion');
-      if(banner) banner.className = "hidden";
-    });
-    window.addEventListener('offline', () => {
-      const banner = document.getElementById('estadoConexion');
-      if(banner) {
-        banner.innerText = "Sin conexión - Trabajando localmente";
-        banner.className = "bg-amber-500 text-white text-center text-xs py-1 font-bold";
-      }
-    });
-
     onValue(corralesRef, (snapshot) => {
       window.corralesData = snapshot.val() || {};
       renderCorrales();
@@ -79,150 +66,124 @@
       if (!nombre) return;
 
       const newCorralRef = push(corralesRef);
-      toggleModal('modalNuevoCorral', false);
-      set(newCorralRef, { nombre: nombre, cantidad: 0 });
-      input.value = '';
+      set(newCorralRef, { nombre: nombre, cantidad: 0 }).then(() => {
+        input.value = '';
+        toggleModal('modalNuevoCorral', false);
+      });
     };
 
     window.eliminarCorral = function(id, nombre) {
       if (confirm(`¿Estás seguro de eliminar el corral "${nombre}"?`)) {
-        remove(ref(db, `corrales/${id}`));
-      }
+        remove(ref(db, `corrales/${id}`)); } };  // 1. ACCIÓN: INGRESAR (SUMAR) window.ejecutarIngreso = function() { const corralId = document.getElementById('ingCorralSelect').value; const cantidad = parseInt(document.getElementById('ingCantidadInput').value, 10); const motivo = document.getElementById('ingMotivoSelect').value; const usuario = document.getElementById('ingUsuarioInput').value.trim() \vert{}\vert{} 'Operador'; const notas = document.getElementById('ingNotasInput').value.trim();  if (!corralId \vert{}\vert{} isNaN(cantidad) \vert{}\vert{} cantidad <= 0) { alert("Ingresá una cantidad válida mayor a 0"); return; }  const corral = window.corralesData[corralId]; if (!corral) return;  const nuevaCantidad = corral.cantidad + cantidad; set(ref(db, `corrales/${corralId}/cantidad`), nuevaCantidad);
+
+      const nuevoMovRef = push(historialRef);
+      set(nuevoMovRef, {
+        corralId: corralId,
+        nombreCorral: corral.nombre,
+        tipo: 'SUMAR',
+        cantidad: cantidad,
+        motivo: motivo,
+        notas: notas,
+        usuario: usuario,
+        timestamp: Date.now()
+      }).then(() => {
+        document.getElementById('ingCantidadInput').value = '';
+        document.getElementById('ingNotasInput').value = '';
+        toggleModal('modalIngresar', false);
+      });
     };
 
-    // FUNCIÓN REINICIAR TODO EL SISTEMA
-    window.reiniciarSistema = function() {
-      if (prompt("⚠️ ATENCIÓN: Esta acción borrará absolutamente todos los corrales, fletes e historial. Para confirmar, escribí la palabra BORRAR").trim() === "BORRAR") {
-        set(corralesRef, null);
-        set(historialRef, null);
-        set(fletesRef, null);
-        alert("Sistema reseteado a cero con éxito.");
-      } else {
-        alert("Operación cancelada.");
-      }
-    };
+    // 2. ACCIÓN: EGRESAR (RESTAR)
+    window.ejecutarEgreso = function() {
+      const corralId = document.getElementById('egCorralSelect').value;
+      const cantidad = parseInt(document.getElementById('egCantidadInput').value, 10);
+      const motivo = document.getElementById('egMotivoSelect').value;
+      const usuario = document.getElementById('egUsuarioInput').value.trim() || 'Operador';
+      const notas = document.getElementById('egNotasInput').value.trim();
 
-    window.registrarMovimiento = function(accionFormulario) {
-      const corralId = document.getElementById('movCorralSelect').value;
-      const cantidadInput = document.getElementById('movCantidadInput');
-      const motivo = document.getElementById('movMotivoSelect').value;
-      const notas = document.getElementById('movNotasInput').value.trim();
-      const usuario = document.getElementById('movUsuarioInput').value.trim() || 'Operador';
-      const corralDestinoId = document.getElementById('movCorralDestinoSelect').value;
-
-      const cantidad = parseInt(cantidadInput.value, 10);
       if (!corralId || isNaN(cantidad) || cantidad <= 0) {
         alert("Ingresá una cantidad válida mayor a 0");
         return;
       }
 
-      const corralActual = window.corralesData[corralId];
-      if (!corralActual) return;
+      const corral = window.corralesData[corralId];
+      if (!corral) return;
 
-      // LÓGICA DE TRASLADO (Afecta origen y destino sin importar de qué botón se accione)
-      if (motivo === 'Traslado') {
-        if (!corralDestinoId) {
-          alert("Seleccioná el corral de destino para el traslado.");
+      if (cantidad > corral.cantidad) {
+        if (!confirm(`La cantidad a restar (${cantidad}) supera las vacas en el corral (${corral.cantidad}). ¿Continuar de todos modos?`)) {
           return;
         }
-        if (corralId === corralDestinoId) {
-          alert("El corral de origen y destino no pueden ser el mismo.");
-          return;
-        }
-
-        const corralDestino = window.corralesData[corralDestinoId];
-        if (!corralDestino) return;
-
-        if (cantidad > corralActual.cantidad) {
-          if (!confirm(`La cantidad a trasladar (${cantidad}) supera las vacas en el corral de origen (${corralActual.cantidad}). ¿Continuar de todos modos?`)) {
-            return;
-          }
-        }
-
-        finalizarMovimiento();
-
-        const nuevaCantidadOrigen = Math.max(0, corralActual.cantidad - cantidad);
-        const nuevaCantidadDestino = corralDestino.cantidad + cantidad;
-
-        set(ref(db, `corrales/${corralId}/cantidad`), nuevaCantidadOrigen);
-        set(ref(db, `corrales/${corralDestinoId}/cantidad`), nuevaCantidadDestino);
-
-        const timestamp = Date.now();
-
-        // Registro de salida en origen
-        const movOrigenRef = push(historialRef);
-        set(movOrigenRef, {
-          corralId: corralId,
-          nombreCorral: corralActual.nombre,
-          tipo: 'RESTAR',
-          cantidad: cantidad,
-          motivo: 'Traslado',
-          notas: `Hacia ${corralDestino.nombre} ${notas ? '- ' + notas : ''}`,
-          usuario: usuario,
-          timestamp: timestamp
-        });
-
-        // Registro de entrada en destino
-        const movDestinoRef = push(historialRef);
-        set(movDestinoRef, {
-          corralId: corralDestinoId,
-          nombreCorral: corralDestino.nombre,
-          tipo: 'SUMAR',
-          cantidad: cantidad,
-          motivo: 'Traslado (Entrada)',
-          notas: `Desde ${corralActual.nombre} ${notas ? '- ' + notas : ''}`,
-          usuario: usuario,
-          timestamp: timestamp + 1
-        });
-
-      } else if (accionFormulario === 'SUMAR') {
-        finalizarMovimiento();
-        const nuevaCantidad = corralActual.cantidad + cantidad;
-        set(ref(db, `corrales/${corralId}/cantidad`), nuevaCantidad);
-
-        const nuevoMovRef = push(historialRef);
-        set(nuevoMovRef, {
-          corralId: corralId,
-          nombreCorral: corralActual.nombre,
-          tipo: 'SUMAR',
-          cantidad: cantidad,
-          motivo: motivo,
-          notas: notas,
-          usuario: usuario,
-          timestamp: Date.now()
-        });
-
-      } else {
-        // RESTAR
-        if (cantidad > corralActual.cantidad) {
-          if (!confirm(`La cantidad a restar (${cantidad}) supera las vacas en el corral (${corralActual.cantidad}). ¿Continuar de todos modos?`)) {
-            return;
-          }
-        }
-
-        finalizarMovimiento();
-        const nuevaCantidad = Math.max(0, corralActual.cantidad - cantidad);
-        set(ref(db, `corrales/${corralId}/cantidad`), nuevaCantidad);
-
-        const nuevoMovRef = push(historialRef);
-        set(nuevoMovRef, {
-          corralId: corralId,
-          nombreCorral: corralActual.nombre,
-          tipo: 'RESTAR',
-          cantidad: cantidad,
-          motivo: motivo,
-          notas: notas,
-          usuario: usuario,
-          timestamp: Date.now()
-        });
       }
+
+      const nuevaCantidad = Math.max(0, corral.cantidad - cantidad);
+      set(ref(db, `corrales/${corralId}/cantidad`), nuevaCantidad);
+
+      const nuevoMovRef = push(historialRef);
+      set(nuevoMovRef, {
+        corralId: corralId,
+        nombreCorral: corral.nombre,
+        tipo: 'RESTAR',
+        cantidad: cantidad,
+        motivo: motivo,
+        notas: notas,
+        usuario: usuario,
+        timestamp: Date.now()
+      }).then(() => {
+        document.getElementById('egCantidadInput').value = '';
+        document.getElementById('egNotasInput').value = '';
+        toggleModal('modalEgresar', false);
+      });
     };
 
-    function finalizarMovimiento() {
-      document.getElementById('movCantidadInput').value = '';
-      document.getElementById('movNotasInput').value = '';
-      toggleModal('modalMovimiento', false);
-    }
+    // 3. ACCIÓN: TRASLADAR (DESDE - HACIA CLARO EN HISTORIAL)
+    window.ejecutarTraslado = function() {
+      const origenId = document.getElementById('trOrigenSelect').value;
+      const destinoId = document.getElementById('trDestinoSelect').value;
+      const cantidad = parseInt(document.getElementById('trCantidadInput').value, 10);
+      const usuario = document.getElementById('trUsuarioInput').value.trim() || 'Operador';
+      const notas = document.getElementById('trNotasInput').value.trim();
+
+      if (!origenId || !destinoId || isNaN(cantidad) || cantidad <= 0) {
+        alert("Completá todos los campos correctamente.");
+        return;
+      }
+
+      if (origenId === destinoId) {
+        alert("El corral de origen y destino no pueden ser el mismo.");
+        return;
+      }
+
+      const corralOrigen = window.corralesData[origenId];
+      const corralDestino = window.corralesData[destinoId];
+
+      if (!corralOrigen || !corralDestino) return;
+
+      if (cantidad > corralOrigen.cantidad) {
+        if (!confirm(`Vas a sacar ${cantidad} cabezas, pero el corral origen tiene${corralOrigen.cantidad}. ¿Continuar?`)) {
+          return;
+        }
+      }
+
+      // Actualizar Origen y Destino en BD
+      const nuevaOrigen = Math.max(0, corralOrigen.cantidad - cantidad);
+      set(ref(db, `corrales/${origenId}/cantidad`), nuevaOrigen);  const nuevaDestino = corralDestino.cantidad + cantidad; set(ref(db, `corrales/${destinoId}/cantidad`), nuevaDestino);
+
+      // Registrar en el Historial con el formato "Desde [Origen] hacia [Destino]"
+      const nuevoMovRef = push(historialRef);
+      set(nuevoMovRef, {
+        tipo: 'TRASLADO',
+        cantidad: cantidad,
+        motivo: 'Traslado entre corrales',
+        nombreCorral: `Desde ${corralOrigen.nombre} hacia${corralDestino.nombre}`,
+        notas: notas,
+        usuario: usuario,
+        timestamp: Date.now()
+      }).then(() => {
+        document.getElementById('trCantidadInput').value = '';
+        document.getElementById('trNotasInput').value = '';
+        toggleModal('modalTraslado', false);
+      });
+    };
 
     window.guardarFlete = function() {
       const transportista = document.getElementById('fleteTransportista').value.trim();
@@ -238,42 +199,51 @@
         return;
       }
 
-      toggleModal('modalFlete', false);
-
       const nuevoFleteRef = push(fletesRef);
       set(nuevoFleteRef, {
         transportista, chofer, guia, destino, cantidad, costo, estadoPago,
         timestamp: Date.now()
+      }).then(() => {
+        document.getElementById('fleteTransportista').value = '';
+        document.getElementById('fleteChofer').value = '';
+        document.getElementById('fleteGuia').value = '';
+        document.getElementById('fleteDestino').value = '';
+        document.getElementById('fleteCantidad').value = '';
+        document.getElementById('fleteCosto').value = '';
+        toggleModal('modalFlete', false);
       });
-
-      document.getElementById('fleteTransportista').value = '';
-      document.getElementById('fleteChofer').value = '';
-      document.getElementById('fleteGuia').value = '';
-      document.getElementById('fleteDestino').value = '';
-      document.getElementById('fleteCantidad').value = '';
-      document.getElementById('fleteCosto').value = '';
     };
 
     window.eliminarFlete = function(id) {
       if (confirm("¿Eliminar este registro de flete?")) {
-        remove(ref(db, `fletes/${id}`));
+        remove(ref(db, `fletes/${id}`)); } };  // FUNCIÓN DE REINICIO INTELIGENTE window.resetearSistema = function() { const conservarCorrales = confirm( "¿Querés CONSERVAR los nombres de los corrales actuales?\n\n" + "• OK / SÍ: Borra el stock a 0, limpia el historial y los fletes, pero MANTIENE los corrales creados.\n" + "• CANCELAR / NO: Te preguntará si querés borrar TODO absolutamente." );  if (conservarCorrales) { // Poner corrales a 0 pero mantenerlos const corrales = window.corralesData \vert{}\vert{} {}; Object.keys(corrales).forEach(id => { set(ref(db, `corrales/${id}/cantidad`), 0);
+        });
+        // Borrar historial y fletes
+        set(historialRef, null);
+        set(fletesRef, null);
+        alert("Sistema reiniciado. Los corrales se mantuvieron en 0 cabezas y se limpió el historial y fletes.");
+      } else {
+        const borrarTodo = confirm("¡ADVERTENCIA! Esto borrará ABSOLUTAMENTE TODO (corrales, historial y fletes). ¿Estás totalmente seguro?");
+        if (borrarTodo) {
+          set(corralesRef, null);
+          set(historialRef, null);
+          set(fletesRef, null);
+          alert("Base de datos completamente limpia.");
+        }
       }
     };
   </script>
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans min-h-screen pb-20">
 
-  <!-- Aviso de Estado Offline -->
-  <div id="estadoConexion" class="hidden"></div>
-
   <!-- Encabezado Principal -->
   <header class="bg-emerald-700 text-white p-4 shadow-md sticky top-0 z-10">
     <div class="max-w-3xl mx-auto flex justify-between items-center">
       <div>
         <h1 class="text-xl font-bold flex items-center gap-2">
-          <i class="fa-solid font-bold fa-cow"></i> TatoCows
+          <i class="fa-solid font-bold fa-cow"></i> Control de Ganado
         </h1>
-        <p class="text-xs text-emerald-200">Administracion de ganado (Nube / Offline)</p>
+        <p class="text-xs text-emerald-200">Sincronizado en tiempo real (Nube)</p>
       </div>
       <div class="flex gap-2">
         <button onclick="toggleModal('modalFlete', true)" class="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-semibold py-2 px-3 rounded-lg flex items-center gap-1 shadow">
@@ -311,18 +281,22 @@
       </div>
     </section>
 
-    <!-- SECCIÓN 1: CORRALES -->
+    <!-- SECCIÓN 1: CORRALES (3 BOTONES PRINCIPALES) -->
     <div id="seccionCorrales" class="space-y-4">
-      <section class="grid grid-cols-2 gap-4">
-        <button onclick="abrirModalMovimiento('SUMAR')" class="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold p-3 rounded-xl shadow flex flex-col items-center justify-center gap-1">
-          <i class="fa-solid fa-circle-plus text-2xl"></i>
-          <span class="text-sm">INGRESAR / SUMAR</span>
+      <div class="grid grid-cols-3 gap-2">
+        <button onclick="abrirModal('modalIngresar')" class="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold p-3 rounded-xl shadow flex flex-col items-center justify-center gap-1">
+          <i class="fa-solid fa-circle-plus text-xl"></i>
+          <span class="text-xs">INGRESAR</span>
         </button>
-        <button onclick="abrirModalMovimiento('RESTAR')" class="bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold p-3 rounded-xl shadow flex flex-col items-center justify-center gap-1">
-          <i class="fa-solid fa-circle-minus text-2xl"></i>
-          <span class="text-sm">EGRESAR / RESTAR</span>
+        <button onclick="abrirModal('modalEgresar')" class="bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold p-3 rounded-xl shadow flex flex-col items-center justify-center gap-1">
+          <i class="fa-solid fa-circle-minus text-xl"></i>
+          <span class="text-xs">EGRESAR</span>
         </button>
-      </section>
+        <button onclick="abrirModal('modalTraslado')" class="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold p-3 rounded-xl shadow flex flex-col items-center justify-center gap-1">
+          <i class="fa-solid fa-arrow-right-arrow-left text-xl"></i>
+          <span class="text-xs">TRASLADAR</span>
+        </button>
+      </div>
 
       <section>
         <h2 class="text-md font-bold text-slate-700 mb-3 flex items-center gap-2">
@@ -343,14 +317,14 @@
       <div id="listaFletes" class="space-y-3"></div>
     </div>
 
-    <!-- SECCIÓN 3: HISTORIAL -->
+    <!-- SECCIÓN 3: HISTORIAL Y RESET -->
     <div id="seccionHistorial" class="space-y-4 hidden">
       <div class="flex justify-between items-center">
         <h2 class="text-md font-bold text-slate-700 flex items-center gap-2">
-          <i class="fa-solid fa-clock-rotate-left"></i> Historial de Movimientos de Hacienda
+          <i class="fa-solid fa-clock-rotate-left"></i> Historial de Movimientos
         </h2>
-        <button onclick="reiniciarSistema()" class="bg-rose-600 hover:bg-rose-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold shadow flex items-center gap-1">
-          <i class="fa-solid fa-trash-can"></i> Reiniciar Sistema
+        <button onclick="resetearSistema()" class="bg-slate-200 hover:bg-rose-100 hover:text-rose-700 text-slate-600 text-xs px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1">
+          <i class="fa-solid fa-rotate-right"></i> Reiniciar Base
         </button>
       </div>
       <div id="listaHistorial" class="bg-white rounded-xl shadow divide-y divide-slate-100 max-h-96 overflow-y-auto"></div>
@@ -373,40 +347,103 @@
     </div>
   </div>
 
-  <!-- MODAL MOVIMIENTO -->
-  <div id="modalMovimiento" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
+  <!-- MODAL 1: INGRESAR ANIMALES -->
+  <div id="modalIngresar" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
     <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-3">
-      <h3 id="modalMovTitle" class="text-lg font-bold text-slate-800">Movimiento</h3>
-      <div id="contenedorCorralOrigen">
-        <label id="labelCorralOrigen" class="block text-xs font-medium text-slate-600 mb-1">Corral</label>
-        <select id="movCorralSelect" class="w-full border rounded-lg p-3 text-sm bg-white outline-none"></select>
-      </div>
-      
-      <!-- Selector de Corral Destino (Aparece solo si es Traslado) -->
-      <div id="divCorralDestino" class="hidden bg-blue-50 p-3 rounded-xl border border-blue-200 space-y-1">
-        <label class="block text-xs font-bold text-blue-800 mb-1"><i class="fa-solid fa-arrow-right-arrow-left"></i> ¿A qué corral van?</label>
-        <select id="movCorralDestinoSelect" class="w-full border rounded-lg p-2.5 text-sm bg-white outline-none"></select>
-      </div>
-
+      <h3 class="text-lg font-bold text-emerald-700"><i class="fa-solid fa-circle-plus"></i> Ingresar Animales</h3>
       <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">Cantidad de Animales</label>
-        <input type="number" id="movCantidadInput" placeholder="Ej: 15" min="1" class="w-full border rounded-lg p-3 text-sm outline-none">
+        <label class="block text-xs font-medium text-slate-600 mb-1">Corral de Destino</label>
+        <select id="ingCorralSelect" class="w-full border rounded-lg p-3 text-sm bg-white outline-none"></select>
       </div>
-      <div id="contenedorMotivo">
-        <label class="block text-xs font-medium text-slate-600 mb-1">Motivo</label>
-        <select id="movMotivoSelect" onchange="verificarMotivoTraslado()" class="w-full border rounded-lg p-3 text-sm bg-white outline-none"></select>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Cantidad a Sumar</label>
+        <input type="number" id="ingCantidadInput" placeholder="Ej: 15" min="1" class="w-full border rounded-lg p-3 text-sm outline-none">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Motivo de Ingreso</label>
+        <select id="ingMotivoSelect" class="w-full border rounded-lg p-3 text-sm bg-white outline-none">
+          <option value="Compra">Compra / Ingreso</option>
+          <option value="Nacimiento">Nacimiento</option>
+          <option value="Ajuste (+)">Ajuste de Recuento (+)</option>
+        </select>
       </div>
       <div>
         <label class="block text-xs font-medium text-slate-600 mb-1">Registra (Opcional)</label>
-        <input type="text" id="movUsuarioInput" placeholder="Ej: Juan" class="w-full border rounded-lg p-3 text-sm outline-none">
+        <input type="text" id="ingUsuarioInput" placeholder="Ej: Juan" class="w-full border rounded-lg p-3 text-sm outline-none">
       </div>
       <div>
         <label class="block text-xs font-medium text-slate-600 mb-1">Notas / Observaciones</label>
-        <input type="text" id="movNotasInput" placeholder="Ej: Observaciones" class="w-full border rounded-lg p-3 text-sm outline-none">
+        <input type="text" id="ingNotasInput" placeholder="Ej: Guía de compra o detalles" class="w-full border rounded-lg p-3 text-sm outline-none">
       </div>
       <div class="flex justify-end gap-3 pt-2">
-        <button onclick="toggleModal('modalMovimiento', false)" class="px-4 py-2 text-slate-600 font-semibold text-sm">Cancelar</button>
-        <button id="btnConfirmarMovimiento" class="text-white px-5 py-2 rounded-lg font-bold text-sm">Confirmar</button>
+        <button onclick="toggleModal('modalIngresar', false)" class="px-4 py-2 text-slate-600 font-semibold text-sm">Cancelar</button>
+        <button onclick="ejecutarIngreso()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-lg font-bold text-sm">Confirmar Ingreso</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: EGRESAR ANIMALES -->
+  <div id="modalEgresar" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-3">
+      <h3 class="text-lg font-bold text-rose-700"><i class="fa-solid fa-circle-minus"></i> Egresar / Restar Animales</h3>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Corral de Origen (Sacar de aquí)</label>
+        <select id="egCorralSelect" class="w-full border rounded-lg p-3 text-sm bg-white outline-none"></select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Cantidad a Restar</label>
+        <input type="number" id="egCantidadInput" placeholder="Ej: 10" min="1" class="w-full border rounded-lg p-3 text-sm outline-none">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Motivo de Egreso</label>
+        <select id="egMotivoSelect" class="w-full border rounded-lg p-3 text-sm bg-white outline-none">
+          <option value="Venta">Venta</option>
+          <option value="Muerte">Muerte / Baja</option>
+          <option value="Ajuste (-)">Ajuste de Recuento (-)</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Registra (Opcional)</label>
+        <input type="text" id="egUsuarioInput" placeholder="Ej: Juan" class="w-full border rounded-lg p-3 text-sm outline-none">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Notas / Observaciones</label>
+        <input type="text" id="egNotasInput" placeholder="Ej: Comprador Pérez, motivo de baja" class="w-full border rounded-lg p-3 text-sm outline-none">
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button onclick="toggleModal('modalEgresar', false)" class="px-4 py-2 text-slate-600 font-semibold text-sm">Cancelar</button>
+        <button onclick="ejecutarEgreso()" class="bg-rose-600 hover:bg-rose-700 text-white px-5 py-2 rounded-lg font-bold text-sm">Confirmar Egreso</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: TRASLADAR ENTRE CORRALES -->
+  <div id="modalTraslado" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-3">
+      <h3 class="text-lg font-bold text-blue-700"><i class="fa-solid fa-arrow-right-arrow-left"></i> Traslado entre Corrales</h3>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">1. Corral de Origen (De dónde salen)</label>
+        <select id="trOrigenSelect" class="w-full border rounded-lg p-3 text-sm bg-white outline-none"></select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">2. Corral de Destino (A dónde van)</label>
+        <select id="trDestinoSelect" class="w-full border rounded-lg p-3 text-sm bg-white outline-none"></select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Cantidad a Mover</label>
+        <input type="number" id="trCantidadInput" placeholder="Ej: 20" min="1" class="w-full border rounded-lg p-3 text-sm outline-none">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Registra (Opcional)</label>
+        <input type="text" id="trUsuarioInput" placeholder="Ej: Juan" class="w-full border rounded-lg p-3 text-sm outline-none">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Notas / Observaciones</label>
+        <input type="text" id="trNotasInput" placeholder="Ej: Aparte por vacunación" class="w-full border rounded-lg p-3 text-sm outline-none">
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button onclick="toggleModal('modalTraslado', false)" class="px-4 py-2 text-slate-600 font-semibold text-sm">Cancelar</button>
+        <button onclick="ejecutarTraslado()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-bold text-sm">Confirmar Traslado</button>
       </div>
     </div>
   </div>
@@ -483,69 +520,22 @@
 
     function toggleModal(id, show) {
       const modal = document.getElementById(id);
-      if (show) modal.classList.remove('hidden');
-      else modal.classList.add('hidden');
+      if (show) {
+        populateSelects();
+        modal.classList.remove('hidden');
+      } else {
+        modal.classList.add('hidden');
+      }
     }
 
-    window.verificarMotivoTraslado = function() {
-      const motivo = document.getElementById('movMotivoSelect').value;
-      const divDestino = document.getElementById('divCorralDestino');
-      if (motivo === 'Traslado') {
-        divDestino.classList.remove('hidden');
-      } else {
-        divDestino.classList.add('hidden');
-      }
-    };
-
-    function abrirModalMovimiento(tipo) {
+    window.abrirModal = function(id) {
       const ids = Object.keys(window.corralesData || {});
       if (ids.length === 0) {
-        alert("Primero debés crear al menos un corral.");
+        alert("Primero debés crear al menos un corral con el botón '+ Corral'.");
         return;
       }
-      const title = document.getElementById('modalMovTitle');
-      const btn = document.getElementById('btnConfirmarMovimiento');
-      const contenedorMotivo = document.getElementById('contenedorMotivo');
-      const labelOrigen = document.getElementById('labelCorralOrigen');
-      const motivoSelect = document.getElementById('movMotivoSelect');
-
-      populateSelects();
-
-      if (tipo === 'SUMAR') {
-        title.innerText = "Ingresar / Sumar Animales";
-        labelOrigen.innerText = "Corral de Destino";
-        contenedorMotivo.style.display = 'block';
-        
-        motivoSelect.innerHTML = `
-          <option value="Compra">Compra / Ingreso</option>
-          <option value="Nacimiento">Nacimiento</option>
-          <option value="Traslado">Traslado entre corrales</option>
-          <option value="Recuento">Ajuste de Recuento</option>
-        `;
-        motivoSelect.value = 'Compra';
-
-        btn.className = "bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-lg font-bold text-sm";
-        btn.onclick = () => registrarMovimiento('SUMAR');
-      } else {
-        title.innerText = "Egresar / Restar o Trasladar";
-        labelOrigen.innerText = "Corral de Origen (Sacar de aquí)";
-        contenedorMotivo.style.display = 'block';
-
-        motivoSelect.innerHTML = `
-          <option value="Venta">Venta</option>
-          <option value="Muerte">Muerte / Baja</option>
-          <option value="Traslado">Traslado entre corrales</option>
-          <option value="Recuento">Ajuste de Recuento</option>
-        `;
-        motivoSelect.value = 'Venta';
-
-        btn.className = "bg-rose-600 hover:bg-rose-700 text-white px-5 py-2 rounded-lg font-bold text-sm";
-        btn.onclick = () => registrarMovimiento('RESTAR');
-      }
-      
-      verificarMotivoTraslado();
-      toggleModal('modalMovimiento', true);
-    }
+      toggleModal(id, true);
+    };
 
     function renderStats() {
       const corrales = window.corralesData || {};
@@ -588,15 +578,20 @@
     }
 
     function populateSelects() {
-      const select = document.getElementById('movCorralSelect');
-      const selectDestino = document.getElementById('movCorralDestinoSelect');
       const corrales = window.corralesData || {};
       const opciones = Object.keys(corrales).map(id => 
         `<option value="${id}">${corrales[id].nombre} (${corrales[id].cantidad} cabezas)</option>`
       ).join('');
       
-      select.innerHTML = opciones;
-      if (selectDestino) selectDestino.innerHTML = opciones;
+      const selIng = document.getElementById('ingCorralSelect');
+      const selEg = document.getElementById('egCorralSelect');
+      const selTrOrig = document.getElementById('trOrigenSelect');
+      const selTrDest = document.getElementById('trDestinoSelect');
+
+      if (selIng) selIng.innerHTML = opciones;
+      if (selEg) selEg.innerHTML = opciones;
+      if (selTrOrig) selTrOrig.innerHTML = opciones;
+      if (selTrDest) selTrDest.innerHTML = opciones;
     }
 
     function renderHistorial() {
@@ -610,9 +605,16 @@
 
       container.innerHTML = list.map(h => {
         const fecha = h.timestamp ? new Date(h.timestamp).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : 'Reciente';
+        const esTraslado = h.tipo === 'TRASLADO';
         const esSuma = h.tipo === 'SUMAR';
-        const colorClass = esSuma ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50';
-        const signo = esSuma ? '+' : '-';
+        
+        let colorClass = 'text-blue-600 bg-blue-50';
+        let signo = '<i class="fa-solid fa-arrow-right-arrow-left text-xs"></i>';
+        
+        if (!esTraslado) {
+          colorClass = esSuma ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50';
+          signo = esSuma ? '+' : '-';
+        }
 
         return `
           <div class="p-3 flex items-center justify-between text-sm">
@@ -625,8 +627,8 @@
                 <p class="text-xs text-slate-400">${fecha} ${h.usuario ? '&bull; ' + h.usuario : ''} ${h.notas ? '&bull; ' + h.notas : ''}</p>
               </div>
             </div>
-            <span class="font-bold text-base ${esSuma ? 'text-emerald-600' : 'text-rose-600'}">
-              ${signo}${h.cantidad}
+            <span class="font-bold text-base ${esTraslado ? 'text-blue-600' : (esSuma ? 'text-emerald-600' : 'text-rose-600')}">
+              ${esTraslado ? h.cantidad : (esSuma ? '+' + h.cantidad : '-' + h.cantidad)}
             </span>
           </div>
         `;
@@ -651,7 +653,7 @@
             <div class="flex justify-between items-start">
               <div>
                 <h3 class="font-bold text-base text-slate-800"><i class="fa-solid fa-truck text-blue-600 mr-1"></i> ${f.transportista}</h3>
-                <p class="text-xs text-slate-500">Fecha: ${fecha} ${f.chofer ? '&bull; Chofer: ' + f.chofer : ''}</p>
+                <p class="text-xs text-slate-500">Fecha: ${fecha}${f.chofer ? '&bull; Chofer: ' + f.chofer : ''}</p>
               </div>
               <button onclick="eliminarFlete('${f.id}')" class="text-slate-300 hover:text-rose-500 p-1">
                 <i class="fa-solid fa-trash"></i>
@@ -660,16 +662,4 @@
             <div class="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-lg text-xs">
               <div><span class="text-slate-400">Guía DTE:</span> <strong class="text-slate-700">${f.guia || 'N/D'}</strong></div>
               <div><span class="text-slate-400">Cantidad:</span> <strong class="text-emerald-700">${f.cantidad} cabezas</strong></div>
-              <div><span class="text-slate-400">Destino:</span> <strong class="text-slate-700">${f.destino || 'N/D'}</strong></div>
-              <div><span class="text-slate-400">Costo:</span> <strong class="text-slate-700">$${f.costo.toLocaleString()}</strong></div>
-            </div>
-            <div class="flex justify-end pt-1">
-              <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full ${pagoClase}">Pago: ${f.estadoPago}</span>
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-  </script>
-</body>
-</html>
+              <div><span class="text-slate-400">Destino:</span> <strong class="text-slate-7
