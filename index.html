@@ -476,4 +476,579 @@
           <p class="text-xs text-slate-400">Tocá una tarea para editar sus detalles</p>
         </div>
         <div class="flex gap-2">
-          <button onclick="archivarCompletadas()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs
+          <button onclick="archivarCompletadas()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-2.5 py-2 rounded-lg font-bold shadow flex items-center gap-1" title="Archivar tareas completadas">
+            <i class="fa-solid fa-box-archive"></i> Archivar
+          </button>
+          <button onclick="toggleModal('modalNuevaTarea', true)" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2 rounded-lg font-bold shadow flex items-center gap-1">
+            <i class="fa-solid fa-plus"></i> Nueva Tarea
+          </button>
+        </div>
+      </div>
+
+      <!-- Columnas Kanban -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <!-- Columna 1: Tomado -->
+        <div class="bg-slate-200/70 p-3 rounded-xl space-y-2">
+          <div class="flex justify-between items-center font-bold text-xs text-slate-700 uppercase tracking-wider">
+            <span><i class="fa-regular fa-circle text-slate-500 mr-1"></i> Tomadas</span>
+            <span id="countTomado" class="bg-slate-300 text-slate-700 px-2 py-0.5 rounded-full text-[10px]">0</span>
+          </div>
+          <div id="colTomado" class="space-y-2 min-h-[150px]"></div>
+        </div>
+
+        <!-- Columna 2: En Ejecución -->
+        <div class="bg-amber-50 p-3 rounded-xl space-y-2 border border-amber-200">
+          <div class="flex justify-between items-center font-bold text-xs text-amber-800 uppercase tracking-wider">
+            <span><i class="fa-solid fa-spinner text-amber-600 mr-1"></i> En Ejecución</span>
+            <span id="countEjecucion" class="bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full text-[10px]">0</span>
+          </div>
+          <div id="colEjecucion" class="space-y-2 min-h-[150px]"></div>
+        </div>
+
+        <!-- Columna 3: Completado -->
+        <div class="bg-emerald-50 p-3 rounded-xl space-y-2 border border-emerald-200">
+          <div class="flex justify-between items-center font-bold text-xs text-emerald-800 uppercase tracking-wider">
+            <span><i class="fa-solid fa-check-circle text-emerald-600 mr-1"></i> Completadas</span>
+            <span id="countCompletado" class="bg-emerald-200 text-emerald-800 px-2 py-0.5 rounded-full text-[10px]">0</span>
+          </div>
+          <div id="colCompletado" class="space-y-2 min-h-[150px]"></div>
+        </div>
+      </div>
+
+      <!-- Apartado de Notas Rápidas / Pizarrón -->
+      <div class="bg-white p-4 rounded-xl shadow space-y-3 mt-6">
+        <h3 class="text-sm font-bold text-slate-700 flex items-center gap-2">
+          <i class="fa-solid fa-note-sticky text-amber-500"></i> Notas Rápidas de Campo (Pizarrón Libre)
+        </h3>
+        <div class="flex gap-2">
+          <input type="text" id="notaRapidaInput" placeholder="Ej: Dejar llaves del tractor en el galpón..." class="w-full border rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-amber-500">
+          <button onclick="guardarNotaRapida()" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow">Anotar</button>
+        </div>
+        <div id="listaNotasRapidas" class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2"></div>
+      </div>
+    </div>
+
+    <!-- SECCIÓN 4: HISTORIAL Y RESET SEGURO -->
+    <div id="seccionHistorial" class="space-y-4 hidden">
+      <div class="flex justify-between items-center">
+        <h2 class="text-md font-bold text-slate-700 flex items-center gap-2">
+          <i class="fa-solid fa-clock-rotate-left"></i> Historial de Movimientos
+        </h2>
+        <button onclick="toggleModal('modalReset', true)" class="bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1 shadow-sm">
+          <i class="fa-solid fa-triangle-exclamation"></i> Reiniciar Base
+        </button>
+      </div>
+      <div id="listaHistorial" class="bg-white rounded-xl shadow divide-y divide-slate-100 max-h-96 overflow-y-auto"></div>
+    </div>
+
+  </main>
+
+  <!-- MODAL NUEVO CORRAL -->
+  <div id="modalNuevoCorral" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4">
+      <h3 class="text-lg font-bold text-slate-800">Agregar Nuevo Corral</h3>
+      <div>
+        <label class="block text-sm font-medium text-slate-600 mb-1">Nombre o Número</label>
+        <input type="text" id="nombreCorralInput" placeholder="Ej: Corral 1, Potrero Bajo" class="w-full border rounded-lg p-3 text-base focus:ring-2 focus:ring-emerald-500 outline-none">
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button onclick="toggleModal('modalNuevoCorral', false)" class="px-4 py-2 text-slate-600 font-semibold">Cancelar</button>
+        <button onclick="crearCorral()" class="bg-emerald-600 text-white px-5 py-2 rounded-lg font-bold">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 1: INGRESAR ANIMALES -->
+  <div id="modalIngresar" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-3">
+      <h3 class="text-lg font-bold text-emerald-700"><i class="fa-solid fa-circle-plus"></i> Ingresar Animales</h3>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Corral de Destino</label>
+        <select id="ingCorralSelect" class="w-full border rounded-lg p-3 text-sm bg-white outline-none"></select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Cantidad a Sumar</label>
+        <input type="number" id="ingCantidadInput" placeholder="Ej: 15" min="1" class="w-full border rounded-lg p-3 text-sm outline-none">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Motivo de Ingreso</label>
+        <select id="ingMotivoSelect" class="w-full border rounded-lg p-3 text-sm bg-white outline-none">
+          <option value="Compra">Compra / Ingreso</option>
+          <option value="Nacimiento">Nacimiento</option>
+          <option value="Ajuste (+)">Ajuste de Recuento (+)</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Registra (Opcional)</label>
+        <input type="text" id="ingUsuarioInput" placeholder="Ej: Juan" class="w-full border rounded-lg p-3 text-sm outline-none">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Notas / Observaciones</label>
+        <input type="text" id="ingNotasInput" placeholder="Ej: Guía de compra o detalles" class="w-full border rounded-lg p-3 text-sm outline-none">
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button onclick="toggleModal('modalIngresar', false)" class="px-4 py-2 text-slate-600 font-semibold text-sm">Cancelar</button>
+        <button onclick="ejecutarIngreso()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-lg font-bold text-sm">Confirmar Ingreso</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: EGRESAR ANIMALES -->
+  <div id="modalEgresar" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-3">
+      <h3 class="text-lg font-bold text-rose-700"><i class="fa-solid fa-circle-minus"></i> Egresar / Restar Animales</h3>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Corral de Origen (Sacar de aquí)</label>
+        <select id="egCorralSelect" class="w-full border rounded-lg p-3 text-sm bg-white outline-none"></select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Cantidad a Restar</label>
+        <input type="number" id="egCantidadInput" placeholder="Ej: 10" min="1" class="w-full border rounded-lg p-3 text-sm outline-none">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Motivo de Egreso</label>
+        <select id="egMotivoSelect" class="w-full border rounded-lg p-3 text-sm bg-white outline-none">
+          <option value="Venta">Venta</option>
+          <option value="Muerte">Muerte / Baja</option>
+          <option value="Ajuste (-)">Ajuste de Recuento (-)</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Registra (Opcional)</label>
+        <input type="text" id="egUsuarioInput" placeholder="Ej: Juan" class="w-full border rounded-lg p-3 text-sm outline-none">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Notas / Observaciones</label>
+        <input type="text" id="egNotasInput" placeholder="Ej: Comprador Pérez, motivo de baja" class="w-full border rounded-lg p-3 text-sm outline-none">
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button onclick="toggleModal('modalEgresar', false)" class="px-4 py-2 text-slate-600 font-semibold text-sm">Cancelar</button>
+        <button onclick="ejecutarEgreso()" class="bg-rose-600 hover:bg-rose-700 text-white px-5 py-2 rounded-lg font-bold text-sm">Confirmar Egreso</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: TRASLADAR ENTRE CORRALES -->
+  <div id="modalTraslado" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-3">
+      <h3 class="text-lg font-bold text-blue-700"><i class="fa-solid fa-arrow-right-arrow-left"></i> Traslado entre Corrales</h3>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">1. Corral de Origen (De dónde salen)</label>
+        <select id="trOrigenSelect" class="w-full border rounded-lg p-3 text-sm bg-white outline-none"></select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">2. Corral de Destino (A dónde van)</label>
+        <select id="trDestinoSelect" class="w-full border rounded-lg p-3 text-sm bg-white outline-none"></select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Cantidad a Mover</label>
+        <input type="number" id="trCantidadInput" placeholder="Ej: 20" min="1" class="w-full border rounded-lg p-3 text-sm outline-none">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Registra (Opcional)</label>
+        <input type="text" id="trUsuarioInput" placeholder="Ej: Juan" class="w-full border rounded-lg p-3 text-sm outline-none">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Notas / Observaciones</label>
+        <input type="text" id="trNotasInput" placeholder="Ej: Aparte por vacunación" class="w-full border rounded-lg p-3 text-sm outline-none">
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button onclick="toggleModal('modalTraslado', false)" class="px-4 py-2 text-slate-600 font-semibold text-sm">Cancelar</button>
+        <button onclick="ejecutarTraslado()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-bold text-sm">Confirmar Traslado</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL FLETE -->
+  <div id="modalFlete" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-3">
+      <h3 class="text-lg font-bold text-slate-800"><i class="fa-solid fa-truck text-blue-600"></i> Registrar Flete / Camión</h3>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Empresa / Transportista</label>
+        <input type="text" id="fleteTransportista" placeholder="Ej: Transportes El Ruso" class="w-full border rounded-lg p-3 text-sm outline-none">
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Chofer</label>
+          <input type="text" id="fleteChofer" placeholder="Nombre" class="w-full border rounded-lg p-2.5 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Guía / DTE (SENASA)</label>
+          <input type="text" id="fleteGuia" placeholder="Nro de Guía" class="w-full border rounded-lg p-2.5 text-sm outline-none">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Cantidad de Animales</label>
+          <input type="number" id="fleteCantidad" placeholder="Ej: 30" class="w-full border rounded-lg p-2.5 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Costo ($)</label>
+          <input type="number" id="fleteCosto" placeholder="Ej: 150000" class="w-full border rounded-lg p-2.5 text-sm outline-none">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Destino / Origen</label>
+          <input type="text" id="fleteDestino" placeholder="Ej: Frigorífico / Feria" class="w-full border rounded-lg p-2.5 text-sm outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Estado del Pago</label>
+          <select id="fleteEstadoPago" class="w-full border rounded-lg p-2.5 text-sm bg-white outline-none">
+            <option value="Pendiente">Pendiente</option>
+            <option value="Pagado">Pagado</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button onclick="toggleModal('modalFlete', false)" class="px-4 py-2 text-slate-600 font-semibold text-sm">Cancelar</button>
+        <button onclick="guardarFlete()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-bold text-sm">Guardar Flete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL NUEVA TAREA (KANBAN) -->
+  <div id="modalNuevaTarea" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-3">
+      <h3 class="text-lg font-bold text-indigo-700"><i class="fa-solid fa-clipboard-list"></i> Nueva Tarea de Campo</h3>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">¿Qué hay que hacer?</label>
+        <input type="text" id="tareaTituloInput" placeholder="Ej: Vacunar terneros" class="w-full border rounded-lg p-3 text-sm outline-none">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Observaciones / Detalles</label>
+        <input type="text" id="tareaObsInput" placeholder="Ej: Comprar vacunas y jeringas" class="w-full border rounded-lg p-3 text-sm outline-none">
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button onclick="toggleModal('modalNuevaTarea', false)" class="px-4 py-2 text-slate-600 font-semibold text-sm">Cancelar</button>
+        <button onclick="guardarTarea()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg font-bold text-sm">Guardar Tarea</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL REINICIO SEGURO -->
+  <div id="modalReset" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4">
+      <h3 class="text-lg font-bold text-rose-700 flex items-center gap-2">
+        <i class="fa-solid fa-triangle-exclamation"></i> Reinicio o Limpieza de Base
+      </h3>
+      <p class="text-xs text-slate-500">Seleccioná qué elementos deseás borrar y escribí BORRAR para confirmar:</p>
+      
+      <div class="space-y-2 bg-slate-50 p-3 rounded-xl text-sm">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="chkCabezas" class="w-4 h-4 text-rose-600 rounded">
+          <span>Poner cantidad de cabezas en 0 (manteniendo corrales)</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="chkCorrales" class="w-4 h-4 text-rose-600 rounded">
+          <span>Borrar TODOS los corrales creados</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="chkFletes" class="w-4 h-4 text-rose-600 rounded">
+          <span>Borrar registros de Fletes</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="chkHistorial" class="w-4 h-4 text-rose-600 rounded">
+          <span>Borrar Historial de Movimientos</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="chkTareas" class="w-4 h-4 text-rose-600 rounded">
+          <span>Borrar Tablero de Tareas</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="chkNotas" class="w-4 h-4 text-rose-600 rounded">
+          <span>Borrar Notas Rápidas (Pizarrón)</span>
+        </label>
+      </div>
+
+      <div class="space-y-1">
+        <label class="block text-xs font-bold text-slate-700">Escribí <span class="text-rose-600 font-extrabold">BORRAR</span> para habilitar el botón:</label>
+        <input type="text" id="inputPalabraBorrar" placeholder="Escribí BORRAR aquí" class="w-full border rounded-lg p-2.5 text-sm uppercase outline-none focus:ring-2 focus:ring-rose-500">
+      </div>
+
+      <div class="flex justify-end gap-3 pt-2">
+        <button onclick="toggleModal('modalReset', false)" class="px-4 py-2 text-slate-600 font-semibold text-sm">Cancelar</button>
+        <button onclick="ejecutarReinicioSeguro()" class="bg-rose-600 hover:bg-rose-700 text-white px-5 py-2 rounded-lg font-bold text-sm shadow">Ejecutar Limpieza</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.cambiarTab = function(tab) {
+      document.getElementById('seccionCorrales').classList.add('hidden');
+      document.getElementById('seccionFletes').classList.add('hidden');
+      document.getElementById('seccionTareas').classList.add('hidden');
+      document.getElementById('seccionHistorial').classList.add('hidden');
+
+      document.getElementById('btnTabCorrales').className = "py-2 font-bold text-xs rounded-lg text-slate-600 transition";
+      document.getElementById('btnTabFletes').className = "py-2 font-bold text-xs rounded-lg text-slate-600 transition";
+      document.getElementById('btnTabTareas').className = "py-2 font-bold text-xs rounded-lg text-slate-600 transition";
+      document.getElementById('btnTabHistorial').className = "py-2 font-bold text-xs rounded-lg text-slate-600 transition";
+
+      if (tab === 'corrales') {
+        document.getElementById('seccionCorrales').classList.remove('hidden');
+        document.getElementById('btnTabCorrales').className = "py-2 font-bold text-xs rounded-lg bg-emerald-600 text-white transition";
+      } else if (tab === 'fletes') {
+        document.getElementById('seccionFletes').classList.remove('hidden');
+        document.getElementById('btnTabFletes').className = "py-2 font-bold text-xs rounded-lg bg-blue-600 text-white transition";
+      } else if (tab === 'tareas') {
+        document.getElementById('seccionTareas').classList.remove('hidden');
+        document.getElementById('btnTabTareas').className = "py-2 font-bold text-xs rounded-lg bg-indigo-600 text-white transition";
+      } else if (tab === 'historial') {
+        document.getElementById('seccionHistorial').classList.remove('hidden');
+        document.getElementById('btnTabHistorial').className = "py-2 font-bold text-xs rounded-lg bg-slate-700 text-white transition";
+      }
+    };
+
+    window.toggleModal = function(id, show) {
+      const modal = document.getElementById(id);
+      if (show) {
+        populateSelects();
+        modal.classList.remove('hidden');
+      } else {
+        modal.classList.add('hidden');
+      }
+    };
+
+    window.abrirModal = function(id) {
+      const ids = Object.keys(window.corralesData || {});
+      if (ids.length === 0) {
+        alert("Primero debés crear al menos un corral con el botón '+ Nuevo Corral'.");
+        return;
+      }
+      toggleModal(id, true);
+    };
+
+    function renderStats() {
+      const corrales = window.corralesData || {};
+      const fletes = window.fletesData || [];
+      const tareas = window.tareasData || {};
+      const keys = Object.keys(corrales);
+      let totalVacas = 0;
+      keys.forEach(k => { totalVacas += (corrales[k].cantidad || 0); });
+
+      document.getElementById('statTotalVacas').innerText = totalVacas;
+      document.getElementById('statTotalCorrales').innerText = keys.length;
+      document.getElementById('statTotalFletes').innerText = fletes.length;
+      document.getElementById('statTotalTareas').innerText = Object.keys(tareas).length;
+    }
+
+    function renderCorrales() {
+      const container = document.getElementById('listaCorrales');
+      const corrales = window.corralesData || {};
+      const keys = Object.keys(corrales);
+
+      if (keys.length === 0) {
+        container.innerHTML = `<div class="bg-white p-6 rounded-xl text-center text-slate-400 text-sm">No hay corrales registrados. Creá el primero arriba.</div>`;
+        return;
+      }
+
+      container.innerHTML = keys.map(id => {
+        const c = corrales[id];
+        return `
+          <div class="bg-white p-4 rounded-xl shadow flex items-center justify-between">
+            <div>
+              <h3 class="font-bold text-base text-slate-800">${c.nombre}</h3>
+            </div>
+            <div class="flex items-center gap-4">
+              <span class="text-xl font-black text-emerald-700">${c.cantidad} <span class="text-xs font-normal text-slate-500">cabezas</span></span>
+              <button onclick="eliminarCorral('${id}', '${c.nombre}')" class="text-slate-300 hover:text-rose-500 p-2">
+                <i class="fa-solid fa-trash text-sm"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function populateSelects() {
+      const corrales = window.corralesData || {};
+      const opciones = Object.keys(corrales).map(id => 
+        `<option value="${id}">${corrales[id].nombre} (${corrales[id].cantidad} cabezas)</option>`
+      ).join('');
+      
+      const selIng = document.getElementById('ingCorralSelect');
+      const selEg = document.getElementById('egCorralSelect');
+      const selTrOrig = document.getElementById('trOrigenSelect');
+      const selTrDest = document.getElementById('trDestinoSelect');
+
+      if (selIng) selIng.innerHTML = opciones;
+      if (selEg) selEg.innerHTML = opciones;
+      if (selTrOrig) selTrOrig.innerHTML = opciones;
+      if (selTrDest) selTrDest.innerHTML = opciones;
+    }
+
+    function renderKanban() {
+      const tareas = window.tareasData || {};
+      const colTomado = document.getElementById('colTomado');
+      const colEjecucion = document.getElementById('colEjecucion');
+      const colCompletado = document.getElementById('colCompletado');
+
+      let htmlTomado = '';
+      let htmlEjecucion = '';
+      let htmlCompletado = '';
+
+      let cTomado = 0, cEjecucion = 0, cCompletado = 0;
+
+      Object.keys(tareas).forEach(id => {
+        const t = tareas[id];
+        const cardHTML = `
+          <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 space-y-2 text-xs">
+            <div class="flex justify-between items-start gap-2">
+              <span class="font-bold text-slate-800 text-sm">${t.titulo}</span>
+              <button onclick="eliminarTarea('${id}')" class="text-slate-300 hover:text-rose-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div onclick="editarObsTarea('${id}', '${t.observaciones || ''}')" class="text-slate-600 bg-slate-50 p-2 rounded cursor-pointer hover:bg-slate-100 transition border border-dashed border-slate-200" title="Hacé clic para editar detalles">
+              <i class="fa-regular fa-pen-to-square text-slate-400 mr-1"></i> ${t.observaciones || 'Sin detalles (tocá para agregar)'}
+            </div>
+            <div class="flex justify-between items-center pt-1 border-t border-slate-100">
+              <div class="flex gap-1">
+                ${t.estado !== 'tomado' ? `<button onclick="cambiarEstadoTarea('${id}', '${t.estado === 'completado' ? 'en_ejecucion' : 'tomado'}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-600"><i class="fa-solid fa-chevron-left"></i></button>` : ''}
+              </div>
+              <div class="flex gap-1">
+                ${t.estado !== 'completado' ? `<button onclick="cambiarEstadoTarea('${id}', '${t.estado === 'tomado' ? 'en_ejecucion' : 'completado'}')" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded">Avanzar <i class="fa-solid fa-chevron-right ml-1"></i></button>` : '<span class="text-emerald-600 font-bold">¡Listo!</span>'}
+              </div>
+            </div>
+          </div>
+        `;
+
+        if (t.estado === 'tomado') {
+          htmlTomado += cardHTML;
+          cTomado++;
+        } else if (t.estado === 'en_ejecucion') {
+          htmlEjecucion += cardHTML;
+          cEjecucion++;
+        } else if (t.estado === 'completado') {
+          htmlCompletado += cardHTML;
+          cCompletado++;
+        }
+      });
+
+      colTomado.innerHTML = htmlTomado || '<p class="text-xs text-slate-400 text-center py-4">Sin tareas</p>';
+      colEjecucion.innerHTML = htmlEjecucion || '<p class="text-xs text-slate-400 text-center py-4">Sin tareas</p>';
+      colCompletado.innerHTML = htmlCompletado || '<p class="text-xs text-slate-400 text-center py-4">Sin tareas</p>';
+
+      document.getElementById('countTomado').innerText = cTomado;
+      document.getElementById('countEjecucion').innerText = cEjecucion;
+      document.getElementById('countCompletado').innerText = cCompletado;
+    }
+
+    function renderNotas() {
+      const container = document.getElementById('listaNotasRapidas');
+      const notas = window.notasData || {};
+      const keys = Object.keys(notas);
+
+      if (keys.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-400 col-span-2 text-center py-2">No hay notas rápidas en el pizarrón.</p>`;
+        return;
+      }
+
+      container.innerHTML = keys.map(id => {
+        const n = notas[id];
+        return `
+          <div class="bg-amber-50 border border-amber-200 p-2.5 rounded-lg flex justify-between items-start text-xs shadow-sm">
+            <p class="text-slate-800 break-words pr-2">${n.texto}</p>
+            <button onclick="eliminarNotaRapida('${id}')" class="text-slate-400 hover:text-rose-500"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderHistorial() {
+      const container = document.getElementById('listaHistorial');
+      const list = window.historialData || [];
+
+      if (list.length === 0) {
+        container.innerHTML = `<div class="p-4 text-center text-slate-400 text-sm">Sin movimientos registrados aún.</div>`;
+        return;
+      }
+
+      container.innerHTML = list.map(h => {
+        const fecha = h.timestamp ? new Date(h.timestamp).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : 'Reciente';
+        const esTraslado = h.tipo === 'TRASLADO';
+        const esSuma = h.tipo === 'SUMAR';
+        
+        let colorClass = 'text-blue-600 bg-blue-50';
+        let signo = '<i class="fa-solid fa-arrow-right-arrow-left text-xs"></i>';
+        
+        if (!esTraslado) {
+          colorClass = esSuma ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50';
+          signo = esSuma ? '+' : '-';
+        }
+
+        return `
+          <div class="p-3 flex items-center justify-between text-sm">
+            <div class="flex items-center gap-3">
+              <span class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs ${colorClass}">
+                ${signo}
+              </span>
+              <div>
+                <p class="font-semibold text-slate-800">${h.nombreCorral} &bull; <span class="text-slate-500 font-normal">${h.motivo}</span></p>
+                <p class="text-xs text-slate-400">${fecha} ${h.usuario ? '&bull; ' + h.usuario : ''} ${h.notas ? '&bull; ' + h.notas : ''}</p>
+              </div>
+            </div>
+            <span class="font-bold text-base ${esTraslado ? 'text-blue-600' : (esSuma ? 'text-emerald-600' : 'text-rose-600')}">
+              ${esTraslado ? h.cantidad : (esSuma ? '+' + h.cantidad : '-' + h.cantidad)}
+            </span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderFletes() {
+      const container = document.getElementById('listaFletes');
+      const list = window.fletesData || [];
+
+      let totalGastado = 0;
+      let totalPendiente = 0;
+
+      list.forEach(f => {
+        const costo = f.costo || 0;
+        totalGastado += costo;
+        if (f.estadoPago === 'Pendiente') {
+          totalPendiente += costo;
+        }
+      });
+
+      document.getElementById('fletesTotalGastado').innerText = '$' + totalGastado.toLocaleString();
+      document.getElementById('fletesTotalPendiente').innerText = '$' + totalPendiente.toLocaleString();
+
+      if (list.length === 0) {
+        container.innerHTML = `<div class="bg-white p-6 rounded-xl text-center text-slate-400 text-sm">No hay fletes registrados.</div>`;
+        return;
+      }
+
+      container.innerHTML = list.map(f => {
+        const fecha = f.timestamp ? new Date(f.timestamp).toLocaleDateString('es-AR') : 'Reciente';
+        const pagoClase = f.estadoPago === 'Pagado' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800';
+
+        return `
+          <div class="bg-white p-4 rounded-xl shadow space-y-2 text-sm">
+            <div class="flex justify-between items-start">
+              <div>
+                <h3 class="font-bold text-base text-slate-800"><i class="fa-solid fa-truck text-blue-600 mr-1"></i> ${f.transportista}</h3>
+                <p class="text-xs text-slate-500">Fecha: ${fecha} ${f.chofer ? '&bull; Chofer: ' + f.chofer : ''}</p>
+              </div>
+              <button onclick="eliminarFlete('${f.id}')" class="text-slate-300 hover:text-rose-500 p-1">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </div>
+            <div class="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-lg text-xs">
+              <div><span class="text-slate-400">Guía DTE:</span> <strong class="text-slate-700">${f.guia || 'N/D'}</strong></div>
+              <div><span class="text-slate-400">Cantidad:</span> <strong class="text-emerald-700">${f.cantidad} cabezas</strong></div>
+              <div><span class="text-slate-400">Destino:</span> <strong class="text-slate-700">${f.destino || 'N/D'}</strong></div>
+              <div><span class="text-slate-400">Costo:</span> <strong class="text-slate-700">$${f.costo.toLocaleString()}</strong></div>
+            </div>
+            <div class="flex justify-between items-center pt-1">
+              <button onclick="toggleEstadoPagoFlete('${f.id}', '${f.estadoPago}')" class="text-xs text-blue-600 hover:underline font-semibold">
+                <i class="fa-solid fa-rotate mr-1"></i> Cambiar a ${f.estadoPago === 'Pagado' ? 'Pendiente' : 'Pagado'}
+              </button>
+              <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full ${pagoClase}">Pago: ${f.estadoPago}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  </script>
+</body>
+</html>
