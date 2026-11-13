@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Control de Ganado y Fletes - Campo</title>
+  <title>Administracion Encargado de Mantenimiento</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
 
@@ -34,11 +34,13 @@
     const historialRef = ref(db, 'historial');
     const fletesRef = ref(db, 'fletes');
     const tareasRef = ref(db, 'tareas');
+    const notasRef = ref(db, 'notas_rapidas');
 
     window.corralesData = {};
     window.historialData = [];
     window.fletesData = [];
     window.tareasData = {};
+    window.notasData = {};
 
     onValue(corralesRef, (snapshot) => {
       window.corralesData = snapshot.val() || {};
@@ -66,6 +68,11 @@
       window.tareasData = snapshot.val() || {};
       renderKanban();
       renderStats();
+    });
+
+    onValue(notasRef, (snapshot) => {
+      window.notasData = snapshot.val() || {};
+      renderNotas();
     });
 
     window.crearCorral = function() {
@@ -215,7 +222,7 @@
       });
     };
 
-    // GESTIÓN DE FLETES (CON CAMBIO DE ESTADO DE PAGO)
+    // GESTIÓN DE FLETES
     window.guardarFlete = function() {
       const transportista = document.getElementById('fleteTransportista').value.trim();
       const chofer = document.getElementById('fleteChofer').value.trim();
@@ -295,11 +302,46 @@
       }
     };
 
+    // ARCHIVAR TAREAS COMPLETADAS
+    window.archivarCompletadas = function() {
+      const tareas = window.tareasData || {};
+      let archivadas = 0;
+      Object.keys(tareas).forEach(id => {
+        if (tareas[id].estado === 'completado') {
+          remove(ref(db, `tareas/${id}`));
+          archivadas++;
+        }
+      });
+      if (archivadas > 0) {
+        alert(`Se archivaron y limpiaron ${archivadas} tareas completadas del tablero.`);
+      } else {
+        alert("No hay tareas completadas para archivar.");
+      }
+    };
+
+    // NOTAS RÁPIDAS
+    window.guardarNotaRapida = function() {
+      const texto = document.getElementById('notaRapidaInput').value.trim();
+      if (!texto) return;
+
+      const nuevaNotaRef = push(notasRef);
+      set(nuevaNotaRef, {
+        texto,
+        timestamp: Date.now()
+      }).then(() => {
+        document.getElementById('notaRapidaInput').value = '';
+      });
+    };
+
+    window.eliminarNotaRapida = function(id) {
+      remove(ref(db, `notas_rapidas/${id}`));
+    };
+
     // REINICIO SEGURO CON CHECKBOXES Y PALABRA "BORRAR"
     window.ejecutarReinicioSeguro = function() {
       const palabra = document.getElementById('inputPalabraBorrar').value.trim();
       if (palabra !== "BORRAR") {
-        alert("Debes escribir la palabra exactas BORRAR en mayúsculas para confirmar.");
+        alert("Debes escribir la palabra exacta BORRAR en mayúsculas para confirmar.");
         return;
       }
 
@@ -308,6 +350,7 @@
       const borrarFletes = document.getElementById('chkFletes').checked;
       const borrarHistorial = document.getElementById('chkHistorial').checked;
       const borrarTareas = document.getElementById('chkTareas').checked;
+      const borrarNotas = document.getElementById('chkNotas').checked;
 
       if (borrarCorrales) {
         set(corralesRef, null);
@@ -321,6 +364,7 @@
       if (borrarFletes) set(fletesRef, null);
       if (borrarHistorial) set(historialRef, null);
       if (borrarTareas) set(tareasRef, null);
+      if (borrarNotas) set(notasRef, null);
 
       alert("Reinicio aplicado correctamente.");
       toggleModal('modalReset', false);
@@ -330,14 +374,14 @@
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans min-h-screen pb-20">
 
-  <!-- Encabezado Principal Limpio -->
+  <!-- Encabezado Principal Actualizado -->
   <header class="bg-emerald-700 text-white p-4 shadow-md sticky top-0 z-10">
     <div class="max-w-3xl mx-auto flex justify-between items-center">
       <div>
         <h1 class="text-xl font-bold flex items-center gap-2">
-          <i class="fa-solid font-bold fa-cow"></i> Control de Ganado & Campo
+          <i class="fa-solid font-bold fa-cow"></i> Administracion Encargado de Mantenimiento
         </h1>
-        <p class="text-xs text-emerald-200">Sincronizado en tiempo real (Nube)</p>
+        <p class="text-xs text-emerald-200">programado para Esteban Company</p>
       </div>
     </div>
   </header>
@@ -414,21 +458,31 @@
           + Nuevo Flete
         </button>
       </div>
+      <!-- Resumen Financiero de Fletes -->
+      <div id="resumenFletesBox" class="bg-blue-50 border border-blue-200 p-3 rounded-xl flex justify-between items-center text-xs">
+        <div>Total Gastado: <strong id="fletesTotalGastado" class="text-blue-900">$0</strong></div>
+        <div>Pendiente de Pago: <strong id="fletesTotalPendiente" class="text-amber-700">$0</strong></div>
+      </div>
       <div id="listaFletes" class="space-y-3"></div>
     </div>
 
-    <!-- SECCIÓN 3: TABLERO KANBAN DE TRABAJOS -->
+    <!-- SECCIÓN 3: TABLERO KANBAN Y NOTAS RÁPIDAS -->
     <div id="seccionTareas" class="space-y-4 hidden">
       <div class="flex justify-between items-center">
         <div>
           <h2 class="text-md font-bold text-slate-700 flex items-center gap-2">
-            <i class="fa-solid fa-clipboard-list"></i> Tablero de Labores del Campo
+            <i class="fa-solid fa-clipboard-list"></i> Tablero de Labores
           </h2>
           <p class="text-xs text-slate-400">Tocá una tarea para editar sus detalles</p>
         </div>
-        <button onclick="toggleModal('modalNuevaTarea', true)" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2 rounded-lg font-bold shadow flex items-center gap-1">
-          <i class="fa-solid fa-plus"></i> Nueva Tarea
-        </button>
+        <div class="flex gap-2">
+          <button onclick="archivarCompletadas()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-2.5 py-2 rounded-lg font-bold shadow flex items-center gap-1" title="Archivar tareas completadas">
+            <i class="fa-solid fa-box-archive"></i> Archivar
+          </button>
+          <button onclick="toggleModal('modalNuevaTarea', true)" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2 rounded-lg font-bold shadow flex items-center gap-1">
+            <i class="fa-solid fa-plus"></i> Nueva Tarea
+          </button>
+        </div>
       </div>
 
       <!-- Columnas Kanban -->
@@ -459,6 +513,18 @@
           </div>
           <div id="colCompletado" class="space-y-2 min-h-[150px]"></div>
         </div>
+      </div>
+
+      <!-- Apartado de Notas Rápidas / Pizarrón -->
+      <div class="bg-white p-4 rounded-xl shadow space-y-3 mt-6">
+        <h3 class="text-sm font-bold text-slate-700 flex items-center gap-2">
+          <i class="fa-solid fa-note-sticky text-amber-500"></i> Notas Rápidas de Campo (Pizarrón Libre)
+        </h3>
+        <div class="flex gap-2">
+          <input type="text" id="notaRapidaInput" placeholder="Ej: Dejar llaves del tractor en el galpón..." class="w-full border rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-amber-500">
+          <button onclick="guardarNotaRapida()" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow">Anotar</button>
+        </div>
+        <div id="listaNotasRapidas" class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2"></div>
       </div>
     </div>
 
@@ -689,6 +755,10 @@
           <input type="checkbox" id="chkTareas" class="w-4 h-4 text-rose-600 rounded">
           <span>Borrar Tablero de Tareas</span>
         </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="chkNotas" class="w-4 h-4 text-rose-600 rounded">
+          <span>Borrar Notas Rápidas (Pizarrón)</span>
+        </label>
       </div>
 
       <div class="space-y-1">
@@ -863,6 +933,27 @@
       document.getElementById('countCompletado').innerText = cCompletado;
     }
 
+    function renderNotas() {
+      const container = document.getElementById('listaNotasRapidas');
+      const notas = window.notasData || {};
+      const keys = Object.keys(notas);
+
+      if (keys.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-400 col-span-2 text-center py-2">No hay notas rápidas en el pizarrón.</p>`;
+        return;
+      }
+
+      container.innerHTML = keys.map(id => {
+        const n = notas[id];
+        return `
+          <div class="bg-amber-50 border border-amber-200 p-2.5 rounded-lg flex justify-between items-start text-xs shadow-sm">
+            <p class="text-slate-800 break-words pr-2">${n.texto}</p>
+            <button onclick="eliminarNotaRapida('${id}')" class="text-slate-400 hover:text-rose-500"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+        `;
+      }).join('');
+    }
+
     function renderHistorial() {
       const container = document.getElementById('listaHistorial');
       const list = window.historialData || [];
@@ -907,6 +998,20 @@
     function renderFletes() {
       const container = document.getElementById('listaFletes');
       const list = window.fletesData || [];
+
+      let totalGastado = 0;
+      let totalPendiente = 0;
+
+      list.forEach(f => {
+        const costo = f.costo || 0;
+        totalGastado += costo;
+        if (f.estadoPago === 'Pendiente') {
+          totalPendiente += costo;
+        }
+      });
+
+      document.getElementById('fletesTotalGastado').innerText = '$' + totalGastado.toLocaleString();
+      document.getElementById('fletesTotalPendiente').innerText = '$' + totalPendiente.toLocaleString();
 
       if (list.length === 0) {
         container.innerHTML = `<div class="bg-white p-6 rounded-xl text-center text-slate-400 text-sm">No hay fletes registrados.</div>`;
