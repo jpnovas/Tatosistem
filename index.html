@@ -79,18 +79,24 @@
     window.crearCorral = function() {
       const inputNombre = document.getElementById('nombreCorralInput');
       const inputObs = document.getElementById('obsCorralInput');
+      const inputColor = document.getElementById('colorCorralInput');
+      
       const nombre = inputNombre.value.trim();
       const observacion = inputObs.value.trim();
+      const color = inputColor.value;
+
       if (!nombre) return;
 
       const newCorralRef = push(corralesRef);
       set(newCorralRef, { 
         nombre: nombre, 
         observacion: observacion,
+        color: color,
         cantidad: 0 
       }).then(() => {
         inputNombre.value = '';
         inputObs.value = '';
+        inputColor.value = 'emerald';
         toggleModal('modalNuevoCorral', false);
       });
     };
@@ -101,6 +107,7 @@
       document.getElementById('editCorralIdInput').value = id;
       document.getElementById('editNombreCorralInput').value = corral.nombre || '';
       document.getElementById('editObsCorralInput').value = corral.observacion || '';
+      document.getElementById('editColorCorralInput').value = corral.color || 'emerald';
       toggleModal('modalEditarCorral', true);
     };
 
@@ -108,6 +115,7 @@
       const id = document.getElementById('editCorralIdInput').value;
       const nombre = document.getElementById('editNombreCorralInput').value.trim();
       const observacion = document.getElementById('editObsCorralInput').value.trim();
+      const color = document.getElementById('editColorCorralInput').value;
 
       if (!id || !nombre) {
         alert("El nombre del lote o corral no puede estar vacío.");
@@ -116,7 +124,8 @@
 
       update(ref(db, `corrales/${id}`), {
         nombre: nombre,
-        observacion: observacion
+        observacion: observacion,
+        color: color
       }).then(() => {
         toggleModal('modalEditarCorral', false);
       });
@@ -128,7 +137,7 @@
       }
     };
 
-    // 1. INGRESAR
+    // 1. INGRESAR (Cierra ventana de inmediato por seguridad/offline)
     window.ejecutarIngreso = function() {
       const corralId = document.getElementById('ingCorralSelect').value;
       const cantidad = parseInt(document.getElementById('ingCantidadInput').value, 10);
@@ -145,6 +154,10 @@
       if (!corral) return;
 
       const nuevaCantidad = (corral.cantidad || 0) + cantidad;
+      
+      // Cerramos modal de inmediato para evitar bloqueos si no hay internet
+      toggleModal('modalIngresar', false);
+
       set(ref(db, `corrales/${corralId}/cantidad`), nuevaCantidad);
 
       const nuevoMovRef = push(historialRef);
@@ -157,12 +170,10 @@
         notas: notas,
         usuario: usuario,
         timestamp: Date.now()
-      }).then(() => {
-        toggleModal('modalIngresar', false);
       });
     };
 
-    // 2. EGRESAR
+    // 2. EGRESAR (Cierra ventana de inmediato por seguridad/offline)
     window.ejecutarEgreso = function() {
       const corralId = document.getElementById('egCorralSelect').value;
       const cantidad = parseInt(document.getElementById('egCantidadInput').value, 10);
@@ -185,6 +196,10 @@
       }
 
       const nuevaCantidad = Math.max(0, (corral.cantidad || 0) - cantidad);
+
+      // Cerramos modal de inmediato
+      toggleModal('modalEgresar', false);
+
       set(ref(db, `corrales/${corralId}/cantidad`), nuevaCantidad);
 
       const nuevoMovRef = push(historialRef);
@@ -197,12 +212,10 @@
         notas: notas,
         usuario: usuario,
         timestamp: Date.now()
-      }).then(() => {
-        toggleModal('modalEgresar', false);
       });
     };
 
-    // 3. TRASLADAR
+    // 3. TRASLADAR (Cierra ventana de inmediato por seguridad/offline)
     window.ejecutarTraslado = function() {
       const origenId = document.getElementById('trOrigenSelect').value;
       const destinoId = document.getElementById('trDestinoSelect').value;
@@ -232,9 +245,12 @@
       }
 
       const nuevaOrigen = Math.max(0, (corralOrigen.cantidad || 0) - cantidad);
-      set(ref(db, `corrales/${origenId}/cantidad`), nuevaOrigen);
-
       const nuevaDestino = (corralDestino.cantidad || 0) + cantidad;
+
+      // Cerramos modal de inmediato
+      toggleModal('modalTraslado', false);
+
+      set(ref(db, `corrales/${origenId}/cantidad`), nuevaOrigen);
       set(ref(db, `corrales/${destinoId}/cantidad`), nuevaDestino);
 
       const nuevoMovRef = push(historialRef);
@@ -246,8 +262,6 @@
         notas: notas,
         usuario: usuario,
         timestamp: Date.now()
-      }).then(() => {
-        toggleModal('modalTraslado', false);
       });
     };
 
@@ -598,6 +612,17 @@
         <label class="block text-sm font-medium text-slate-600 mb-1">Observación / Cultivo (Opcional)</label>
         <input type="text" id="obsCorralInput" placeholder="Ej: Soja, Maíz, Pastura, etc." class="w-full border rounded-lg p-3 text-base focus:ring-2 focus:ring-emerald-500 outline-none">
       </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-600 mb-1">Color / Identificación de Campo</label>
+        <select id="colorCorralInput" class="w-full border rounded-lg p-3 text-sm bg-white outline-none">
+          <option value="emerald">Verde (Campo Principal)</option>
+          <option value="blue">Azul (Campo Norte / Anexo)</option>
+          <option value="amber">Ámbar / Amarillo (Lote Cerca)</option>
+          <option value="purple">Violeta (Campo 3)</option>
+          <option value="rose">Rojo (Especial / Feria)</option>
+          <option value="slate">Gris / Estándar</option>
+        </select>
+      </div>
       <div class="flex justify-end gap-3 pt-2">
         <button onclick="toggleModal('modalNuevoCorral', false)" class="px-4 py-2 text-slate-600 font-semibold">Cancelar</button>
         <button onclick="crearCorral()" class="bg-emerald-600 text-white px-5 py-2 rounded-lg font-bold">Guardar</button>
@@ -617,8 +642,19 @@
         <input type="text" id="editNombreCorralInput" class="w-full border rounded-lg p-3 text-base focus:ring-2 focus:ring-emerald-500 outline-none">
       </div>
       <div>
-        <label class="block text-sm font-medium text-slate-600 mb-1">Observación / Cultivo (Dejar vacío para quitar)</label>
+        <label class="block text-sm font-medium text-slate-600 mb-1">Observación / Cultivo</label>
         <input type="text" id="editObsCorralInput" placeholder="Ej: Soja sembrada, Libre, etc." class="w-full border rounded-lg p-3 text-base focus:ring-2 focus:ring-emerald-500 outline-none">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-600 mb-1">Color / Identificación de Campo</label>
+        <select id="editColorCorralInput" class="w-full border rounded-lg p-3 text-sm bg-white outline-none">
+          <option value="emerald">Verde (Campo Principal)</option>
+          <option value="blue">Azul (Campo Norte / Anexo)</option>
+          <option value="amber">Ámbar / Amarillo (Lote Cerca)</option>
+          <option value="purple">Violeta (Campo 3)</option>
+          <option value="rose">Rojo (Especial / Feria)</option>
+          <option value="slate">Gris / Estándar</option>
+        </select>
       </div>
       <div class="flex justify-end gap-3 pt-2">
         <button onclick="toggleModal('modalEditarCorral', false)" class="px-4 py-2 text-slate-600 font-semibold">Cancelar</button>
@@ -798,400 +834,3 @@
   <div id="modalNuevaTarea" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
     <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-3">
       <h3 class="text-lg font-bold text-indigo-700"><i class="fa-solid fa-clipboard-list"></i> Nueva Tarea de Campo</h3>
-      <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">¿Qué hay que hacer?</label>
-        <input type="text" id="tareaTituloInput" placeholder="Ej: Vacunar terneros" class="w-full border rounded-lg p-3 text-sm outline-none">
-      </div>
-      <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">Observaciones / Detalles</label>
-        <input type="text" id="tareaObsInput" placeholder="Ej: Comprar vacunas y jeringas" class="w-full border rounded-lg p-3 text-sm outline-none">
-      </div>
-      <div class="flex justify-end gap-3 pt-2">
-        <button onclick="toggleModal('modalNuevaTarea', false)" class="px-4 py-2 text-slate-600 font-semibold text-sm">Cancelar</button>
-        <button onclick="guardarTarea()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg font-bold text-sm">Guardar Tarea</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL REINICIO SEGURO -->
-  <div id="modalReset" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
-    <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4">
-      <h3 class="text-lg font-bold text-rose-700 flex items-center gap-2">
-        <i class="fa-solid fa-triangle-exclamation"></i> Reinicio o Limpieza de Base
-      </h3>
-      <p class="text-xs text-slate-500">Seleccioná qué elementos deseás borrar y escribí BORRAR para confirmar:</p>
-      
-      <div class="space-y-2 bg-slate-50 p-3 rounded-xl text-sm">
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" id="chkCabezas" class="w-4 h-4 text-rose-600 rounded">
-          <span>Poner cantidad de cabezas en 0 (manteniendo lotes)</span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" id="chkCorrales" class="w-4 h-4 text-rose-600 rounded">
-          <span>Borrar TODOS los lotes/corrales creados</span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" id="chkFletes" class="w-4 h-4 text-rose-600 rounded">
-          <span>Borrar registros de Fletes</span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" id="chkHistorial" class="w-4 h-4 text-rose-600 rounded">
-          <span>Borrar Historial de Movimientos</span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" id="chkTareas" class="w-4 h-4 text-rose-600 rounded">
-          <span>Borrar Tablero de Tareas (incluyendo archivadas)</span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" id="chkNotas" class="w-4 h-4 text-rose-600 rounded">
-          <span>Borrar Notas Rápidas (Pizarrón)</span>
-        </label>
-      </div>
-
-      <div class="space-y-1">
-        <label class="block text-xs font-bold text-slate-700">Escribí <span class="text-rose-600 font-extrabold">BORRAR</span> para habilitar el botón:</label>
-        <input type="text" id="inputPalabraBorrar" placeholder="Escribí BORRAR aquí" class="w-full border rounded-lg p-2.5 text-sm uppercase outline-none focus:ring-2 focus:ring-rose-500">
-      </div>
-
-      <div class="flex justify-end gap-3 pt-2">
-        <button onclick="toggleModal('modalReset', false)" class="px-4 py-2 text-slate-600 font-semibold text-sm">Cancelar</button>
-        <button onclick="ejecutarReinicioSeguro()" class="bg-rose-600 hover:bg-rose-700 text-white px-5 py-2 rounded-lg font-bold text-sm shadow">Ejecutar Limpieza</button>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    window.cambiarTab = function(tab) {
-      document.getElementById('seccionCorrales').classList.add('hidden');
-      document.getElementById('seccionFletes').classList.add('hidden');
-      document.getElementById('seccionTareas').classList.add('hidden');
-      document.getElementById('seccionHistorial').classList.add('hidden');
-
-      document.getElementById('btnTabCorrales').className = "py-2 font-bold text-xs rounded-lg text-slate-600 transition";
-      document.getElementById('btnTabFletes').className = "py-2 font-bold text-xs rounded-lg text-slate-600 transition";
-      document.getElementById('btnTabTareas').className = "py-2 font-bold text-xs rounded-lg text-slate-600 transition";
-      document.getElementById('btnTabHistorial').className = "py-2 font-bold text-xs rounded-lg text-slate-600 transition";
-
-      if (tab === 'corrales') {
-        document.getElementById('seccionCorrales').classList.remove('hidden');
-        document.getElementById('btnTabCorrales').className = "py-2 font-bold text-xs rounded-lg bg-emerald-600 text-white transition";
-      } else if (tab === 'fletes') {
-        document.getElementById('seccionFletes').classList.remove('hidden');
-        document.getElementById('btnTabFletes').className = "py-2 font-bold text-xs rounded-lg bg-blue-600 text-white transition";
-      } else if (tab === 'tareas') {
-        document.getElementById('seccionTareas').classList.remove('hidden');
-        document.getElementById('btnTabTareas').className = "py-2 font-bold text-xs rounded-lg bg-indigo-600 text-white transition";
-      } else if (tab === 'historial') {
-        document.getElementById('seccionHistorial').classList.remove('hidden');
-        document.getElementById('btnTabHistorial').className = "py-2 font-bold text-xs rounded-lg bg-slate-700 text-white transition";
-      }
-    };
-
-    window.toggleModal = function(id, show) {
-      const modal = document.getElementById(id);
-      if (show) {
-        if (id === 'modalIngresar' || id === 'modalEgresar' || id === 'modalTraslado') {
-          populateSelects();
-          // Limpiar campos para que arranquen limpios
-          const cantInput = document.getElementById(id.replace('modal', '').toLowerCase() + 'CantidadInput');
-          const notasInput = document.getElementById(id.replace('modal', '').toLowerCase() + 'NotasInput');
-          const usuarioInput = document.getElementById(id.replace('modal', '').toLowerCase() + 'UsuarioInput');
-          if (cantInput) cantInput.value = '';
-          if (notasInput) notasInput.value = '';
-          if (usuarioInput) usuarioInput.value = '';
-        }
-        modal.classList.remove('hidden');
-      } else {
-        modal.classList.add('hidden');
-      }
-    };
-
-    window.abrirModal = function(id) {
-      const ids = Object.keys(window.corralesData || {});
-      if (ids.length === 0) {
-        alert("Primero debés crear al menos un lote o corral con el botón '+ Nuevo Lote'.");
-        return;
-      }
-      toggleModal(id, true);
-    };
-
-    function renderStats() {
-      const corrales = window.corralesData || {};
-      const fletes = window.fletesData || [];
-      const tareas = window.tareasData || {};
-      const keys = Object.keys(corrales);
-      let totalVacas = 0;
-      keys.forEach(k => { totalVacas += (corrales[k].cantidad || 0); });
-
-      let tareasActivas = 0;
-      Object.keys(tareas).forEach(k => {
-        if (!tareas[k].archivada) tareasActivas++;
-      });
-
-      document.getElementById('statTotalVacas').innerText = totalVacas;
-      document.getElementById('statTotalCorrales').innerText = keys.length;
-      document.getElementById('statTotalFletes').innerText = fletes.length;
-      document.getElementById('statTotalTareas').innerText = tareasActivas;
-    }
-
-    function renderCorrales() {
-      const container = document.getElementById('listaCorrales');
-      const corrales = window.corralesData || {};
-      const keys = Object.keys(corrales);
-
-      if (keys.length === 0) {
-        container.innerHTML = `<div class="bg-white p-6 rounded-xl text-center text-slate-400 text-sm">No hay lotes ni corrales registrados. Creá el primero arriba.</div>`;
-        return;
-      }
-
-      container.innerHTML = keys.map(id => {
-        const c = corrales[id];
-        const obsDisplay = c.observacion 
-          ? `<span class="inline-block bg-amber-100 text-amber-800 text-xs font-medium px-2 py-0.5 rounded border border-amber-200 mt-1 max-w-full truncate">${c.observacion}</span>` 
-          : `<span class="text-xs text-slate-400 italic mt-0.5">Sin observación</span>`;
-
-        return `
-          <div class="bg-white p-4 rounded-xl shadow flex items-center justify-between gap-3">
-            <div class="min-w-0 flex-1">
-              <h3 class="font-black text-base text-slate-800 leading-snug break-words">${c.nombre}</h3>
-              <div>${obsDisplay}</div>
-            </div>
-
-            <div class="flex items-center gap-2 flex-shrink-0">
-              <div class="text-right mr-1">
-                <span class="text-xl font-black text-emerald-700">${c.cantidad || 0}</span>
-                <span class="block text-[10px] text-slate-500 -mt-1">cabezas</span>
-              </div>
-              <button onclick="abrirEditarCorral('${id}')" class="text-slate-400 hover:text-blue-600 p-2 bg-slate-50 rounded-lg" title="Editar lote u observación">
-                <i class="fa-solid fa-pen text-xs"></i>
-              </button>
-              <button onclick="eliminarCorral('${id}', '${c.nombre.replace(/'/g, "\\'")}')" class="text-slate-300 hover:text-rose-500 p-2" title="Eliminar lote">
-                <i class="fa-solid fa-trash text-xs"></i>
-              </button>
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    function populateSelects() {
-      const corrales = window.corralesData || {};
-      const opciones = Object.keys(corrales).map(id => {
-        const obsText = corrales[id].observacion ? ` [${corrales[id].observacion}]` : '';
-        return `<option value="${id}">${corrales[id].nombre}${obsText} (${corrales[id].cantidad || 0} cab.)</option>`;
-      }).join('');
-      
-      const selIng = document.getElementById('ingCorralSelect');
-      const selEg = document.getElementById('egCorralSelect');
-      const selTrOrig = document.getElementById('trOrigenSelect');
-      const selTrDest = document.getElementById('trDestinoSelect');
-
-      if (selIng) selIng.innerHTML = opciones;
-      if (selEg) selEg.innerHTML = opciones;
-      if (selTrOrig) selTrOrig.innerHTML = opciones;
-      if (selTrDest) selTrDest.innerHTML = opciones;
-    }
-
-    function renderKanban() {
-      const tareas = window.tareasData || {};
-      const colTomado = document.getElementById('colTomado');
-      const colEjecucion = document.getElementById('colEjecucion');
-      const colCompletado = document.getElementById('colCompletado');
-      const listaArchivadas = document.getElementById('listaTareasArchivadas');
-
-      let htmlTomado = '';
-      let htmlEjecucion = '';
-      let htmlCompletado = '';
-      let htmlArchivadas = '';
-
-      let cTomado = 0, cEjecucion = 0, cCompletado = 0, cArchivadas = 0;
-
-      Object.keys(tareas).forEach(id => {
-        const t = tareas[id];
-
-        if (t.archivada) {
-          cArchivadas++;
-          htmlArchivadas += `
-            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-between items-start gap-2 text-xs">
-              <div class="space-y-1">
-                <p class="font-bold text-slate-800 text-sm">${t.titulo}</p>
-                <p class="text-slate-600">${t.observaciones || 'Sin descripción'}</p>
-              </div>
-              <div class="flex flex-col gap-1 flex-shrink-0">
-                <button onclick="restaurarTarea('${id}')" class="px-2 py-1 bg-indigo-100 text-indigo-700 rounded font-bold hover:bg-indigo-200" title="Devolver al tablero">
-                  <i class="fa-solid fa-rotate-left"></i>
-                </button>
-                <button onclick="eliminarTarea('${id}')" class="px-2 py-1 bg-rose-100 text-rose-700 rounded font-bold hover:bg-rose-200" title="Borrar definitivamente">
-                  <i class="fa-solid fa-trash"></i>
-                </button>
-              </div>
-            </div>
-          `;
-          return;
-        }
-
-        const cardHTML = `
-          <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 space-y-2 text-xs">
-            <div class="flex justify-between items-start gap-2">
-              <span class="font-bold text-slate-800 text-sm">${t.titulo}</span>
-              <button onclick="eliminarTarea('${id}')" class="text-slate-300 hover:text-rose-500"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <div onclick="editarObsTarea('${id}')" class="text-slate-600 bg-slate-50 p-2 rounded cursor-pointer hover:bg-slate-100 transition border border-dashed border-slate-200" title="Hacé clic para editar detalles">
-              <i class="fa-regular fa-pen-to-square text-slate-400 mr-1"></i> ${t.observaciones || 'Sin detalles (tocá para agregar)'}
-            </div>
-            <div class="flex justify-between items-center pt-1 border-t border-slate-100">
-              <div class="flex gap-1">
-                ${t.estado !== 'tomado' ? `<button onclick="cambiarEstadoTarea('${id}', '${t.estado === 'completado' ? 'en_ejecucion' : 'tomado'}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-600"><i class="fa-solid fa-chevron-left"></i></button>` : ''}
-              </div>
-              <div class="flex gap-1">
-                ${t.estado !== 'completado' ? `<button onclick="cambiarEstadoTarea('${id}', '${t.estado === 'tomado' ? 'en_ejecucion' : 'completado'}')" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded">Avanzar <i class="fa-solid fa-chevron-right ml-1"></i></button>` : '<span class="text-emerald-600 font-bold">¡Listo!</span>'}
-              </div>
-            </div>
-          </div>
-        `;
-
-        if (t.estado === 'tomado') {
-          htmlTomado += cardHTML;
-          cTomado++;
-        } else if (t.estado === 'en_ejecucion') {
-          htmlEjecucion += cardHTML;
-          cEjecucion++;
-        } else if (t.estado === 'completado') {
-          htmlCompletado += cardHTML;
-          cCompletado++;
-        }
-      });
-
-      colTomado.innerHTML = htmlTomado || '<p class="text-xs text-slate-400 text-center py-4">Sin tareas</p>';
-      colEjecucion.innerHTML = htmlEjecucion || '<p class="text-xs text-slate-400 text-center py-4">Sin tareas</p>';
-      colCompletado.innerHTML = htmlCompletado || '<p class="text-xs text-slate-400 text-center py-4">Sin tareas</p>';
-      
-      if (listaArchivadas) {
-        listaArchivadas.innerHTML = htmlArchivadas || '<p class="text-xs text-slate-400 text-center py-6">No hay tareas archivadas aún.</p>';
-      }
-
-      document.getElementById('countTomado').innerText = cTomado;
-      document.getElementById('countEjecucion').innerText = cEjecucion;
-      document.getElementById('countCompletado').innerText = cCompletado;
-      document.getElementById('countArchivadasBtn').innerText = cArchivadas;
-    }
-
-    function renderNotas() {
-      const container = document.getElementById('listaNotasRapidas');
-      const notas = window.notasData || {};
-      const keys = Object.keys(notas);
-
-      if (keys.length === 0) {
-        container.innerHTML = `<p class="text-xs text-slate-400 col-span-2 text-center py-2">No hay notas rápidas en el pizarrón.</p>`;
-        return;
-      }
-
-      container.innerHTML = keys.map(id => {
-        const n = notas[id];
-        return `
-          <div class="bg-amber-50 border border-amber-200 p-2.5 rounded-lg flex justify-between items-start text-xs shadow-sm">
-            <p class="text-slate-800 break-words pr-2">${n.texto}</p>
-            <button onclick="eliminarNotaRapida('${id}')" class="text-slate-400 hover:text-rose-500"><i class="fa-solid fa-xmark"></i></button>
-          </div>
-        `;
-      }).join('');
-    }
-
-    function renderHistorial() {
-      const container = document.getElementById('listaHistorial');
-      const list = window.historialData || [];
-
-      if (list.length === 0) {
-        container.innerHTML = `<div class="p-4 text-center text-slate-400 text-sm">Sin movimientos registrados aún.</div>`;
-        return;
-      }
-
-      container.innerHTML = list.map(h => {
-        const fecha = h.timestamp ? new Date(h.timestamp).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : 'Reciente';
-        const esTraslado = h.tipo === 'TRASLADO';
-        const esSuma = h.tipo === 'SUMAR';
-        
-        let colorClass = 'text-blue-600 bg-blue-50';
-        let signo = '<i class="fa-solid fa-arrow-right-arrow-left text-xs"></i>';
-        
-        if (!esTraslado) {
-          colorClass = esSuma ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50';
-          signo = esSuma ? '+' : '-';
-        }
-
-        return `
-          <div class="p-3 flex items-center justify-between text-sm">
-            <div class="flex items-center gap-3">
-              <span class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs ${colorClass}">
-                ${signo}
-              </span>
-              <div>
-                <p class="font-semibold text-slate-800">${h.nombreCorral} &bull; <span class="text-slate-500 font-normal">${h.motivo}</span></p>
-                <p class="text-xs text-slate-400">${fecha} ${h.usuario ? '&bull; ' + h.usuario : ''} ${h.notas ? '&bull; ' + h.notas : ''}</p>
-              </div>
-            </div>
-            <span class="font-bold text-base ${esTraslado ? 'text-blue-600' : (esSuma ? 'text-emerald-600' : 'text-rose-600')}">
-              ${esTraslado ? h.cantidad : (esSuma ? '+' + h.cantidad : '-' + h.cantidad)}
-            </span>
-          </div>
-        `;
-      }).join('');
-    }
-
-    function renderFletes() {
-      const container = document.getElementById('listaFletes');
-      const list = window.fletesData || [];
-
-      let totalGastado = 0;
-      let totalPendiente = 0;
-
-      list.forEach(f => {
-        const costo = f.costo || 0;
-        totalGastado += costo;
-        if (f.estadoPago === 'Pendiente') {
-          totalPendiente += costo;
-        }
-      });
-
-      document.getElementById('fletesTotalGastado').innerText = '$' + totalGastado.toLocaleString();
-      document.getElementById('fletesTotalPendiente').innerText = '$' + totalPendiente.toLocaleString();
-
-      if (list.length === 0) {
-        container.innerHTML = `<div class="bg-white p-6 rounded-xl text-center text-slate-400 text-sm">No hay fletes registrados.</div>`;
-        return;
-      }
-
-      container.innerHTML = list.map(f => {
-        const fecha = f.timestamp ? new Date(f.timestamp).toLocaleDateString('es-AR') : 'Reciente';
-        const pagoClase = f.estadoPago === 'Pagado' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800';
-
-        return `
-          <div class="bg-white p-4 rounded-xl shadow space-y-2 text-sm">
-            <div class="flex justify-between items-start">
-              <div>
-                <h3 class="font-bold text-base text-slate-800"><i class="fa-solid fa-truck text-blue-600 mr-1"></i> ${f.transportista}</h3>
-                <p class="text-xs text-slate-500">Fecha: ${fecha} ${f.chofer ? '&bull; Chofer: ' + f.chofer : ''}</p>
-              </div>
-              <button onclick="eliminarFlete('${f.id}')" class="text-slate-300 hover:text-rose-500 p-1">
-                <i class="fa-solid fa-trash"></i>
-              </button>
-            </div>
-            <div class="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-lg text-xs">
-              <div><span class="text-slate-400">Guía DTE:</span> <strong class="text-slate-700">${f.guia || 'N/D'}</strong></div>
-              <div><span class="text-slate-400">Cantidad:</span> <strong class="text-emerald-700">${f.cantidad} cabezas</strong></div>
-              <div><span class="text-slate-400">Destino:</span> <strong class="text-slate-700">${f.destino || 'N/D'}</strong></div>
-              <div><span class="text-slate-400">Costo:</span> <strong class="text-slate-700">$${f.costo.toLocaleString()}</strong></div>
-            </div>
-            <div class="flex justify-between items-center pt-1">
-              <button onclick="toggleEstadoPagoFlete('${f.id}', '${f.estadoPago}')" class="text-xs text-blue-600 hover:underline font-semibold">
-                <i class="fa-solid fa-rotate mr-1"></i> Cambiar a ${f.estadoPago === 'Pagado' ? 'Pendiente' : 'Pagado'}
-              </button>
-              <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full ${pagoClase}">Pago: ${f.estadoPago}</span>
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-  </script>
-</body>
-</html>
